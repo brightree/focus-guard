@@ -1063,6 +1063,7 @@ struct SettingsView: View {
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
 
             Toggle("집중 중 쓴 앱 · 사이트 기록 (학습 통계용, 이 맥에만 저장)", isOn: $s.trackStudyUsage)
+            Toggle("아침 6시 이후 처음 맥을 쓸 때 할 일 창 띄우기", isOn: $s.morningPlan)
 
             HStack {
                 Button("저장") {

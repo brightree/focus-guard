@@ -36,6 +36,8 @@ struct Settings: Codable, Equatable {
     var allowSites = ["music.youtube.com"]
     /// 집중·정리 중 맨 앞 앱과 사이트(도메인)를 통계용으로 기록할지
     var trackStudyUsage = true
+    /// 아침 6시 이후 처음 맥을 쓸 때 할 일 창 띄우기
+    var morningPlan = true
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -49,6 +51,7 @@ struct Settings: Codable, Equatable {
         sites = try c.decodeIfPresent([String].self, forKey: .sites) ?? d.sites
         allowSites = try c.decodeIfPresent([String].self, forKey: .allowSites) ?? d.allowSites
         trackStudyUsage = try c.decodeIfPresent(Bool.self, forKey: .trackStudyUsage) ?? d.trackStudyUsage
+        morningPlan = try c.decodeIfPresent(Bool.self, forKey: .morningPlan) ?? d.morningPlan
         self = clamped()
     }
 

@@ -314,12 +314,17 @@ final class Store: ObservableObject {
     }
 
     /// 오늘 처음이면 true — 아침 계획 창을 하루 한 번 띄운다 (미리 적어둔 할 일이 있어도 보여준다)
-    func shouldShowMorningPlan() -> Bool {
-        let k = dayKey()
-        guard data.planShownDay != k else { return false }
+    /// 아침 6시 이후 처음이면 true — 하루 한 번 할 일 창을 띄운다.
+    /// 앱이 켜져 있으면 매초 확인하므로, 맥을 켜거나 깨운 직후(또는 6시가 되는 순간) 바로 뜬다.
+    func shouldShowMorningPlan(at date: Date = Date()) -> Bool {
+        let k = dayKey(date)
+        guard settings.morningPlan, data.planShownDay != k,
+              Calendar.current.component(.hour, from: date) >= Self.morningHour else { return false }
         mutate { $0.planShownDay = k }
         return true
     }
+
+    static let morningHour = 6
 
     // MARK: - 브라우저 감시가 보내는 딴짓 보고
 

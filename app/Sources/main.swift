@@ -163,14 +163,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
 
     // MARK: 동작
 
-    private var checkedDay = ""
-
-    /// 하루의 첫 순간(앱 시작 또는 자정 이후)에 오늘 할 일이 비어 있으면 계획 창을 한 번 띄운다.
+    /// 아침 6시 이후 처음 맥을 쓸 때 할 일 창을 하루 한 번 띄운다 (설정에서 끌 수 있음).
     func checkNewDay(_ now: Date) {
-        let k = dayKey(now)
-        guard k != checkedDay else { return }
-        checkedDay = k
-        if store.shouldShowMorningPlan() { showPlan() }
+        if store.shouldShowMorningPlan(at: now) { showPlan() }
     }
 
     func showPlan() {
