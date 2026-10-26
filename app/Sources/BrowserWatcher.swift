@@ -20,6 +20,10 @@ final class BrowserWatcher {
     private var compiled: [String: NSAppleScript] = [:]
     /// 자동화 권한이 거부된 브라우저들 (브라우저마다 따로 관리)
     private var denied: Set<String> = []
+    /// 권한이 확인된 브라우저 (매초 다시 묻지 않도록)
+    private var granted: Set<String> = []
+    /// 권한 창을 띄워 놓고 답을 기다리는 중인 브라우저
+    private var asking: Set<String> = []
     /// (분, 사이트, 브라우저 번들 ID)
     var onWarn: ((Int, String, String) -> Void)?
 
@@ -100,8 +104,45 @@ final class BrowserWatcher {
         return "http://127.0.0.1:\(SERVER_PORT)/blocked#\(encoded)"
     }
 
+    /// 이 브라우저에 스크립트를 보내도 되는지.
+    /// 아직 정하지 않았으면 권한 창을 딱 한 번 띄우고, 답할 때까지 (시간 제한 없이) 백그라운드에서 기다린다.
+    /// 기다리는 동안엔 스크립트를 보내지 않는다 — 매초 보내면 2초 제한에 걸려 권한 창이 닫혔다 다시 뜬다.
+    private func mayAutomate(_ bid: String) -> Bool {
+        if granted.contains(bid) { return true }
+        if asking.contains(bid) { return false }
+        let target = NSAppleEventDescriptor(bundleIdentifier: bid)
+        switch AEDeterminePermissionToAutomateTarget(target.aeDesc, typeWildCard, typeWildCard, false) {
+        case noErr:
+            granted.insert(bid)
+            setDenied(bid, false)
+            return true
+        case -1744: // 아직 묻지 않음
+            asking.insert(bid)
+            DispatchQueue.global(qos: .userInitiated).async {
+                let status = AEDeterminePermissionToAutomateTarget(target.aeDesc, typeWildCard, typeWildCard, true)
+                DispatchQueue.main.async {
+                    self.asking.remove(bid)
+                    if status == noErr { self.granted.insert(bid) }
+                    self.setDenied(bid, status == -1743)
+                }
+            }
+            return false
+        case -1743: // 거부됨 — 시스템 설정에서 켜면 다음 확인 때 바로 동작한다
+            setDenied(bid, true)
+            return false
+        default: // 브라우저가 실행 중이 아님 등
+            return false
+        }
+    }
+
+    private func setDenied(_ bid: String, _ isDenied: Bool) {
+        if isDenied { denied.insert(bid) } else { denied.remove(bid) }
+        if store.browserAccessDenied != !denied.isEmpty { store.browserAccessDenied = !denied.isEmpty }
+    }
+
     /// AppleScript 실행. 권한 거부(-1743)는 브라우저별로 기록해 패널에서 안내한다.
     private func run(_ bid: String, _ source: String, cache: Bool = true) -> String? {
+        guard mayAutomate(bid) else { return nil }
         let full = "with timeout of 2 seconds\n\(source)\nend timeout"
         let script: NSAppleScript?
         if cache {
@@ -113,11 +154,12 @@ final class BrowserWatcher {
         var err: NSDictionary?
         let result = script?.executeAndReturnError(&err)
         if let err {
-            if (err[NSAppleScript.errorNumber] as? Int) == -1743 { denied.insert(bid) }
-        } else {
-            denied.remove(bid)
+            if (err[NSAppleScript.errorNumber] as? Int) == -1743 { // 실행 중에 권한이 꺼졌다
+                granted.remove(bid)
+                setDenied(bid, true)
+            }
+            return nil
         }
-        if store.browserAccessDenied != !denied.isEmpty { store.browserAccessDenied = !denied.isEmpty }
-        return err == nil ? result?.stringValue : nil
+        return result?.stringValue
     }
 }
