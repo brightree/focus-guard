@@ -36,7 +36,7 @@ final class Store: ObservableObject {
         if let path = UserDefaults.standard.string(forKey: Self.dirKey) {
             dataDir = URL(fileURLWithPath: path)
         } else {
-            dataDir = Self.googleDriveDir() ?? Self.localDir
+            dataDir = Self.localDir // 클라우드 폴더는 사용자가 설정에서 직접 고를 때만 쓴다
         }
         load()
         let t = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.secondTick() }

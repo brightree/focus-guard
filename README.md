@@ -72,13 +72,13 @@ If the server cannot start—for example, because another process is using the p
 
 ### Storage and backups
 
-On first launch, Focus Guard looks for a Google Drive for desktop folder under `~/Library/CloudStorage`. If it finds a supported `My Drive` folder, it uses a `FocusGuard` subfolder there automatically. Otherwise, it uses:
+By default, records are stored only on your Mac:
 
 ```text
 ~/Library/Application Support/FocusGuard/data.json
 ```
 
-You can check the active location or choose another folder in Settings. If the selected folder already contains `data.json`, the app loads that file instead of merging it with the current records. The folder only changes if the current records were saved first and the new location can be read (or written, if it's empty); otherwise the app keeps the old location and tells you why.
+You can check the active location or choose another folder in Settings. **Use Google Drive** picks a `FocusGuard` folder inside Google Drive for desktop's `My Drive`; nothing is moved to a cloud folder unless you choose it. If the selected folder already contains `data.json`, the app loads that file instead of merging it with the current records. The folder only changes if the current records were saved first and the new location can be read (or written, if it's empty); otherwise the app keeps the old location and tells you why.
 
 The file contains tasks, Later items, timer state, session history, wrap-up notes, and distraction statistics. It is **unencrypted JSON**. Anyone with access to the file or its synced folder can read it.
 
@@ -96,7 +96,7 @@ There is no conflict resolution for multiple Macs sharing one folder. A later sa
 
 ### Network and system changes
 
-Focus Guard has no analytics, tracking, automatic updates, or direct outbound network requests. **Files stored in Google Drive or another synced folder may be uploaded by that service**, including when Google Drive is selected automatically on first launch.
+Focus Guard has no analytics, tracking, automatic updates, or direct outbound network requests. **If you choose Google Drive or another synced folder, that service uploads your records.**
 
 The app does not require administrator privileges or change `/etc/hosts`, network settings, or other system files.
 

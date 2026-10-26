@@ -453,6 +453,8 @@ struct GiveUpView: View {
 
     var body: some View {
         let target = store.settings.stopPhrase
+        let matches = Self.normalize(phrase) == Self.normalize(target)
+        let canGiveUp = left <= 0 && matches
         VStack(alignment: .leading, spacing: 12) {
             Text("정말 그만둘까요?").font(.title3.bold())
             Text(left > 0
@@ -460,20 +462,34 @@ struct GiveUpView: View {
                  : "그래도 그만두려면 아래 문장을 그대로 입력하세요.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            TextField(target, text: $phrase).textFieldStyle(.roundedBorder)
+            // 입력하면 사라지는 안내 글자 대신, 따라 칠 문장을 항상 보여준다
+            Text(target).font(.headline).textSelection(.enabled)
+            TextField("위 문장을 그대로 입력", text: $phrase)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { if canGiveUp { giveUp() } }
+            Text(phrase.isEmpty ? " " : (matches ? "✓ 일치해요" : "아직 달라요 (띄어쓰기·문장부호는 상관없어요)"))
+                .font(.caption)
+                .foregroundStyle(matches ? .green : .secondary)
             HStack {
                 Spacer()
-                Button("계속 집중하기", action: close).keyboardShortcut(.defaultAction)
-                Button("포기") {
-                    onGiveUp()
-                    close()
-                }
-                .disabled(left > 0 || phrase.trimmingCharacters(in: .whitespaces) != target)
+                // Enter 는 입력칸에서 포기를 처리하므로, 계속하기는 Esc 로 연결한다
+                Button("계속 집중하기", action: close).keyboardShortcut(.cancelAction)
+                Button("포기", action: giveUp).disabled(!canGiveUp)
             }
         }
         .padding(20)
         .frame(width: 440)
         .onReceive(tick) { _ in if left > 0 { left -= 1 } }
+    }
+
+    private func giveUp() {
+        onGiveUp()
+        close()
+    }
+
+    /// 비교할 때 띄어쓰기·문장부호·유니코드 조합 방식 차이는 무시한다
+    static func normalize(_ s: String) -> String {
+        s.precomposedStringWithCanonicalMapping.filter { !$0.isWhitespace && !$0.isPunctuation }
     }
 }
 
