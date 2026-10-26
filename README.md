@@ -12,17 +12,16 @@ macOS 메뉴 막대 뽀모도로 + 집중 중 사이트 차단
 ## 설치
 
 - 필요: **macOS 14 이상** / Chrome·Safari·Arc·Brave·Edge (Firefox ✕)
-- 터미널에서:
+- 아래 한 줄 복사 (오른쪽 복사 버튼) → **터미널**에 붙여넣기 → Enter
 
 ```bash
-xcode-select --install          # 처음 한 번만
-git clone https://github.com/brightree/focus-guard.git
-cd focus-guard/app
-./build.sh
-open FocusGuard.app
+if ! xcode-select -p >/dev/null 2>&1; then xcode-select --install; echo "👉 설치 창에서 설치를 끝낸 뒤 이 명령을 다시 붙여넣으세요"; else cd ~ && ( [ -d focus-guard ] || git clone -q https://github.com/brightree/focus-guard.git ) && cd focus-guard && git pull -q && cd app && ./build.sh && open FocusGuard.app; fi
 ```
 
+- 개발 도구(Xcode Command Line Tools) 없으면 → 설치 창 뜸 → 설치 후 **같은 명령 한 번 더**
+- 홈 폴더(`~/focus-guard`)에 받아서 빌드 · 실행
 - 메뉴 막대에 🍅 → 완료
+- 업데이트: **같은 명령 다시 붙여넣기**
 - 권한: **"브라우저 제어" 허용** (안 하면 차단 ✕) · 알림 허용
 - 추천: 설정 → **로그인 시 자동 실행** 켜기 (앱 꺼지면 차단 ✕)
 
