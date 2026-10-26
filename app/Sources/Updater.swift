@@ -101,8 +101,9 @@ final class Updater: ObservableObject {
     // MARK: - 내부
 
     private func fetch(_ path: String, _ done: @escaping (String?) -> Void) {
-        var req = URLRequest(url: URL(string: Self.raw + path)!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
-        req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        // 주소 끝을 매번 바꿔서 CDN 에 저장된 옛 사본(최대 5분) 대신 최신 파일을 받는다
+        let url = URL(string: Self.raw + path + "?t=\(Int(Date().timeIntervalSince1970))")!
+        let req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
         URLSession.shared.dataTask(with: req) { data, resp, _ in
             let ok = (resp as? HTTPURLResponse)?.statusCode == 200
             let text = ok ? data.flatMap { String(data: $0, encoding: .utf8) } : nil

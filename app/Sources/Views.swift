@@ -587,6 +587,8 @@ struct DashboardView: View {
     var openPlan: (String) -> Void
     var openSettings: () -> Void
     var quit: () -> Void
+    var openUpdate: () -> Void
+    @ObservedObject private var updater = Updater.shared
     @State private var weekOffset = 0
     @State private var selected = dayKey()
     @State private var newLater = ""
@@ -622,6 +624,24 @@ struct DashboardView: View {
                 DayDetail(key: selected, openPlan: openPlan)
 
                 laterCard
+
+                Divider()
+                HStack {
+                    Text("Focus Guard 버전 \(updater.current)").foregroundStyle(.secondary)
+                    switch updater.state {
+                    case .checking: Text("확인 중…").foregroundStyle(.secondary)
+                    case .upToDate: Text("최신 버전이에요 ✓").foregroundStyle(.secondary)
+                    case .failed(let msg): Text(msg).foregroundStyle(.red).lineLimit(2)
+                    default: EmptyView()
+                    }
+                    Spacer()
+                    if let v = updater.latest {
+                        Button("업데이트 \(v)", action: openUpdate).buttonStyle(.borderedProminent)
+                    } else {
+                        Button("업데이트 확인") { updater.check() }
+                    }
+                }
+                .font(.callout)
             }
             .padding(20)
         }

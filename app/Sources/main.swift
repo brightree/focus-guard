@@ -238,7 +238,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
         Windows.shared.show("dashboard", title: "Focus Guard", resizable: true) {
             DashboardView(openPlan: { [weak self] in self?.showPlan(day: $0) },
                           openSettings: { [weak self] in self?.showSettings() },
-                          quit: { [weak self] in self?.quit() })
+                          quit: { [weak self] in self?.quit() },
+                          openUpdate: { [weak self] in self?.showUpdate() })
         }
     }
 
