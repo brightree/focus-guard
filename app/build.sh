@@ -10,6 +10,13 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 swiftc -O -target "$(uname -m)-apple-macos14.0" -o "$APP/Contents/MacOS/FocusGuard" Sources/*.swift
 
+# 🍅 앱 아이콘 (Finder · Dock · ⌘Tab 에 쓰인다)
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+swiftc -o "$TMP/MakeIcon" MakeIcon.swift
+"$TMP/MakeIcon" "$TMP/AppIcon.iconset"
+iconutil -c icns "$TMP/AppIcon.iconset" -o "$APP/Contents/Resources/AppIcon.icns"
+
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -19,6 +26,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>FocusGuard</string>
   <key>CFBundleDisplayName</key><string>Focus Guard</string>
   <key>CFBundleExecutable</key><string>FocusGuard</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>2.0</string>
   <key>CFBundleVersion</key><string>2</string>
@@ -30,4 +38,6 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 
 codesign --force --sign - "$APP" >/dev/null
+# 바뀐 아이콘이 바로 보이도록 시스템에 다시 등록
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" || true
 echo "built $(pwd)/$APP"

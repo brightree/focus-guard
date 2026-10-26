@@ -80,7 +80,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
     private var lastTitle = ""
 
     func applicationDidFinishLaunching(_ note: Notification) {
-        NSApp.applicationIconImage = Self.tomatoIcon()
         item.button?.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .medium)
         item.button?.target = self
         item.button?.action = #selector(togglePopover)
@@ -106,16 +105,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
     }
 
     func applicationWillTerminate(_ note: Notification) { store.saveNow() }
-
-    /// Dock · ⌘Tab 에 쓸 아이콘 (🍅 이모지를 그린다)
-    static func tomatoIcon() -> NSImage {
-        NSImage(size: NSSize(width: 512, height: 512), flipped: false) { rect in
-            let s = NSAttributedString(string: "🍅", attributes: [.font: NSFont.systemFont(ofSize: 400)])
-            let size = s.size()
-            s.draw(at: NSPoint(x: (rect.width - size.width) / 2, y: (rect.height - size.height) / 2))
-            return true
-        }
-    }
 
     // 앱이 앞에 있어도 알림 배너를 보여준다
     func userNotificationCenter(_ c: UNUserNotificationCenter, willPresent n: UNNotification,

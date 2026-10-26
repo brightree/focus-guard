@@ -30,7 +30,7 @@ struct Settings: Codable, Equatable {
     var wrapMin = 3
     var breakMin = 7
     var warnAfterMin = 10 // 집중 외 시간에 한 사이트를 연속으로 이만큼 쓰면 경고
-    var stopPhrase = "나는 지금 공부를 포기합니다"
+    var stopPhrase = "일해야 졸업하지"
     var sites = ["youtube.com", "linkedin.com", "instagram.com", "facebook.com", "x.com", "twitter.com", "reddit.com", "netflix.com"]
     /// 차단 목록의 하위 도메인이어도 막지 않는 사이트 (예: 공부하며 듣는 유튜브 뮤직)
     var allowSites = ["music.youtube.com"]

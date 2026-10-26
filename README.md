@@ -46,7 +46,7 @@ If you deny browser automation, the menu bar panel shows a warning with a shortc
 1. Click the 🍅 menu bar icon to start a session, pause or resume the timer, open the main window, or end the current phase. You can also add an item to your Later list here.
 2. Press `⌥⇧L` to capture a thought without opening the main window.
 3. Use the main window to review your weekly history, plan today's tasks, or open Settings.
-4. In Settings, adjust durations, the blocked-site list, the stopping phrase, the storage folder, and launch at login. Timer and blocking settings cannot be saved during focus or wrap-up. Every numeric setting is kept within a fixed range (for example, focus is 1–180 minutes).
+4. In Settings, adjust durations, the blocked-site list, the stopping phrase, the storage folder, and launch at login. Settings can be changed at any time; new durations apply from the next phase. Every numeric setting is kept within a fixed range (for example, focus is 1–180 minutes).
 
 ## Privacy, safety, and limitations
 
@@ -129,6 +129,7 @@ To uninstall by hand:
 ```text
 app/
   build.sh                 Builds the app with swiftc; no Xcode project required
+  MakeIcon.swift           Draws the 🍅 app icon at build time
   Sources/
     main.swift             Menu bar, windows, global shortcut, and app startup
     Store.swift            Timer, statistics, and JSON persistence

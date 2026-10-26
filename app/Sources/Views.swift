@@ -795,7 +795,7 @@ struct SettingsView: View {
     @State private var loginOn = SMAppService.mainApp.status == .enabled
 
     var body: some View {
-        let locked = store.isBlocking
+        let locked = store.isBlocking // 삭제만 막는다 (집중 중 차단을 피하는 수단이 되지 않게)
         VStack(alignment: .leading, spacing: 14) {
             Text("시간").font(.headline)
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
@@ -835,9 +835,7 @@ struct SettingsView: View {
                     saved = true
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(locked)
                 if saved { Text("저장됨 ✓").foregroundStyle(.secondary) }
-                if locked { Text("집중·정리 중에는 바꿀 수 없어요").foregroundStyle(.red) }
             }
             if !rejected.isEmpty {
                 Text("사이트로 인식하지 못해 뺐어요: \(rejected.joined(separator: ", "))")
