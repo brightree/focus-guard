@@ -1,66 +1,172 @@
 # 🍅 Focus Guard
 
-**한국어** | [English](README.en.md)
+Focus Guard is a macOS menu bar app that helps you build study habits with Pomodoro sessions, website blocking, and a place to park distractions for later.
 
-macOS 메뉴 막대 뽀모도로 + 집중 중 사이트 차단
+## Features
 
-- 집중 35분 → 정리 3분 → 휴식 7분 (변경 가능)
-- 집중·정리 중 유튜브·인스타·링크드인 등 차단 (유튜브 뮤직은 허용)
-- `⌥⇧L` 어디서든 "나중에 할 것" 메모
-- 할 일 (다른 날 미리 적기 가능) · 아침 6시 이후 첫 사용 때 할 일 창 (설정에서 끄기) · 주간 공부 기록
-- 📊 학습 통계: 일 · 주 단위, 집중 중 많이 쓴 앱 · 사이트 TOP 5 (비율 · 시간), 집중 성공률
+- **A customizable focus cycle:** 35 minutes of focus, 3 minutes to wrap up, and a 7-minute break by default.
+- **Website blocking:** Redirects distracting sites to a local blocked page during focus and wrap-up, including while the timer is paused. The default list includes YouTube, Instagram, LinkedIn, Facebook, X, Twitter, Reddit, and Netflix. You can paste full URLs into the list; only the domain is kept, and lines that aren't recognized as domains are reported. An allow list overrides the block list for specific subdomains; by default it contains `music.youtube.com`, so YouTube Music (including its installed Chrome app) keeps playing during focus.
+- **Distraction reminders:** Outside focus and wrap-up, warns you after 10 minutes of tracked use on a listed site, then at further 10-minute intervals. Brief interruptions of up to 3 minutes can count toward the same streak.
+- **A "Later" list:** Capture a thought from the menu bar or press `⌥⇧L` from any app. Review your list during wrap-up.
+- **Daily planning:** Organize tasks into must-do, nice-to-do, and other tasks for today or any other day, then check them off as you go. The to-do window opens the first time you use your Mac after 6 a.m. each day, showing anything you planned ahead; you can turn this off in Settings.
+- **Weekly history:** Review daily study time, completed sessions, wrap-up notes, and time spent on distracting sites. Sessions that cross midnight are split between the two days.
+- **Study stats:** By day or week, see study time, completed sessions, focus success rate, and the top five apps and websites you used while focusing, with their share and minutes.
+- **Friction before quitting:** Pausing during focus asks "Have you earned this break?" first, and giving up requires typing a confirmation phrase (configurable). Spacing and punctuation don't matter.
+- **Korean and English:** Choose the language at the top of Settings. On first launch, the app follows your Mac's language.
 
-## 설치
+## Requirements
 
-- 필요: **macOS 14 이상** / Chrome·Safari·Arc·Brave·Edge (Firefox ✕)
-- 아래 한 줄 복사 (오른쪽 복사 버튼) → **터미널**에 붙여넣기 → Enter
+- macOS 14 Sonoma or later, on Apple Silicon or Intel.
+- Xcode Command Line Tools, used to build the app from source. The install command below installs them if needed.
+- A supported browser: Google Chrome, Safari, Arc, Brave, or Microsoft Edge. Firefox is not supported.
+
+## Install
+
+Copy this line (use the copy button on the right), paste it into **Terminal**, and press Return:
 
 ```bash
-if ! xcode-select -p >/dev/null 2>&1; then xcode-select --install; echo "👉 설치 창에서 설치를 끝낸 뒤 이 명령을 다시 붙여넣으세요"; else cd ~ && ( [ -d focus-guard ] || git clone -q https://github.com/brightree/focus-guard.git ) && cd focus-guard && git pull -q && cd app && ./build.sh && { pgrep -x FocusGuard >/dev/null && osascript -e 'tell application id "local.focusguard.app" to quit' && sleep 2; open FocusGuard.app; }; fi
+if ! xcode-select -p >/dev/null 2>&1; then xcode-select --install; echo "👉 Finish the installer that just opened, then paste this command again."; else cd ~ && ( [ -d focus-guard ] || git clone -q https://github.com/brightree/focus-guard.git ) && cd focus-guard && git pull -q && cd app && ./build.sh && { pgrep -x FocusGuard >/dev/null && osascript -e 'tell application id "local.focusguard.app" to quit' && sleep 2; open FocusGuard.app; }; fi
 ```
 
-- 개발 도구(Xcode Command Line Tools) 없으면 → 설치 창 뜸 → 설치 후 **같은 명령 한 번 더**
-- 홈 폴더(`~/focus-guard`)에 받아서 빌드 · 실행
-- 메뉴 막대에 🍅 → 완료
-- 버전: 설정 창 맨 아래 · 변경 내역: [CHANGELOG](CHANGELOG.md)
+- If Xcode Command Line Tools aren't installed yet, an installer opens. When it finishes, paste the same command again.
+- The app is downloaded to `~/focus-guard`, built for your Mac, and opened.
+- Focus Guard appears as a 🍅 in the menu bar. It shows up in the Dock and ⌘Tab only while one of its windows is open.
 
-## 업데이트
+To build by hand instead:
 
-- **1.2.0부터**: 새 버전 나오면 맥 알림 → 메뉴 막대 🍅 → **업데이트** 버튼 (터미널 ✕)
-- **1.1.1 이하**: 터미널에 아래 한 줄 (한 번만, 이후엔 버튼으로)
+```bash
+git clone https://github.com/brightree/focus-guard.git
+cd focus-guard/app
+./build.sh
+open FocusGuard.app
+```
+
+### Permissions
+
+| Permission | When it is requested | What it is used for |
+| --- | --- | --- |
+| Automation | When the app first tries to control a supported browser | Read tab URLs, redirect blocked tabs, and close a tab when you choose that action in a reminder. |
+| Notifications | On first launch | Show phase changes, distraction reminders, update notices, and storage problems. |
+| Launch at login | When you enable it in Settings | Start Focus Guard when you log in. Blocking only works while the app is running. |
+
+If you deny browser automation, the menu bar panel shows a warning with a shortcut to **System Settings → Privacy & Security → Automation → Focus Guard**, where you can turn on the relevant browser.
+
+## Updating
+
+The app checks for a new version once a day. When one is available, you get a notification and an **Update** button in the menu bar panel and at the bottom of the main window. The update window lists what changed; **Update Now** runs `git pull` and `build.sh` in the folder the app was built from, then relaunches the new build. If the update fails, the current version keeps running. This only works for copies built from a git clone, as the install command does.
+
+On version 1.1.1 or earlier, update once from Terminal:
 
 ```bash
 killall FocusGuard; cd ~/focus-guard && git pull && cd app && ./build.sh && open FocusGuard.app
 ```
 
-- 또는 위 설치 명령 다시 붙여넣기
-- 권한: **"브라우저 제어" 허용** (안 하면 차단 ✕) · 알림 허용
-- 추천: 설정 → **로그인 시 자동 실행** 켜기 (앱 꺼지면 차단 ✕)
+The current version is shown at the bottom of Settings and the main window. See [CHANGELOG.md](CHANGELOG.md) for changes.
 
-## 유의사항
+## Everyday use
 
-- ⚠️ **집중 시작 시 열린 차단 사이트 탭 → 차단 페이지로 전환 → 쓰던 글 사라질 수 있음**
-- 포기: 설정 문장 입력 필요 (기본 "일해야 졸업하지")
-- 기록: 내 맥에만 저장 (`~/Library/Application Support/FocusGuard`), **암호화 ✕**
-- 학습 통계: 집중 · 정리 중 맨 앞 **앱 이름 · 사이트 도메인 · 시간**만 기록 (전체 주소 · 화면 내용 ✕), 설정에서 끄기 가능
-- 인터넷: 하루 한 번 **새 버전 확인만** (깃허브의 버전 파일 읽기, 보내는 정보 없음)
-- 업데이트 버튼 → 깃허브 최신 코드를 받아 내 맥에서 빌드 · 실행
-- 추적 · 관리자 권한 · 시스템 설정 변경 없음
-- 내 맥 안에서만 열리는 작은 서버 사용 (`127.0.0.1:47321`, 차단 페이지용)
-- 강제 차단 ✕ → 앱 종료·Firefox 사용 시 우회 가능
-- 서명 없는 빌드 → 빌드된 앱 말고 **소스로 각자 빌드**, 재빌드 시 권한 다시 물을 수 있음
-- 개인 프로젝트 → 버그 가능
+1. Click the 🍅 menu bar icon to start a session, pause or resume the timer, open the main window, or end the current phase. You can also add an item to your Later list here.
+2. Press `⌥⇧L` to capture a thought without opening the main window.
+3. Use the main window to review your weekly history, plan to-dos, open Study Stats, or open Settings.
+4. In Settings, change the language, durations, blocked and allowed sites, the stopping phrase, tracking, the morning to-do window, the storage folder, and launch at login. Settings can be changed at any time; new durations apply from the next phase. Every numeric setting is kept within a fixed range (for example, focus is 1–180 minutes).
 
-## 삭제
+## Privacy, safety, and limitations
 
-- 설정 → **Focus Guard 삭제…** → 앱(+선택 시 기록) 휴지통으로 이동
+### Browser access
 
-자세한 보안·저장 방식·한계: [English README](README.en.md)
+[BrowserWatcher.swift](app/Sources/BrowserWatcher.swift) checks the active tab of the foreground browser roughly once per second. At the start of a focus session—and when the app launches with focus or wrap-up still active—it also reads the URLs of all tabs in running supported browsers and redirects matching tabs, including those in background windows.
 
-## 만든 사람
+Browsing statistics contain the matched domain and tracked time, not full URLs or page contents. For study stats, the app also records, during focus and wrap-up only (not while paused or idle for a minute), the name of the frontmost app and, for supported browsers, the active tab's domain, with time spent. You can turn this off in Settings. The original URL is encoded in the blocked page's URL fragment so you can return to it later. Fragments are not sent to the local HTTP server, but the full blocked-page URL may remain in browser history or browser sync.
+
+macOS grants broad browser automation permission. This app uses it to read tab URLs, replace them with the blocked page, and close a tab when you choose “Close this tab” in a reminder.
+
+**Redirecting a tab can discard unsaved work.** Save drafts before starting a focus session. The reminder's close action first re-checks the browser's current tab and closes it only if it is still on the site the reminder was about; if you've switched to another site, it does nothing.
+
+### Local web server
+
+[Server.swift](app/Sources/Server.swift) serves the blocked page at `http://127.0.0.1:47321`. It binds to the IPv4 loopback address, so it is not directly accessible from other devices on your network.
+
+The server requires the exact `Host` header `127.0.0.1:47321`. When an `Origin` header is present, it must match `http://127.0.0.1:47321`. These checks help restrict requests from other websites; they do not authenticate local applications. Malformed requests (missing, invalid, or duplicate `Content-Length`) are rejected, request bodies are limited to 64 KB, and connections are closed after 5 seconds.
+
+Other programs running on your Mac can read the current phase, remaining time, and session task title, or add items to the Later list through this server.
+
+If the server cannot start—for example, because another process is using the port—the app still redirects tabs to that address. The blocked page may fail to load; if another service is listening there, its response may appear instead. When the blocked page can't reach the app, it says so rather than claiming the session has ended.
+
+### Storage and backups
+
+By default, records are stored only on your Mac:
+
+```text
+~/Library/Application Support/FocusGuard/data.json
+```
+
+You can check the active location or choose another folder in Settings. If the selected folder already contains `data.json`, the app loads that file instead of merging it with the current records. The folder only changes if the current records were saved first and the new location can be read (or written, if it's empty); otherwise the app keeps the old location and tells you why.
+
+The file contains tasks, Later items, timer state, session history, wrap-up notes, and distraction statistics. It is **unencrypted JSON**. Anyone with access to the file or its synced folder can read it.
+
+The app creates a dated backup on the first successful save each day and keeps the 14 most recent backups in a `backups/` subfolder. These are local copies beside the data file, not independent backups.
+
+How the app protects an existing file:
+
+- **The file exists but can't be read** (for example, a cloud file that hasn't downloaded): the app stops saving so it can't overwrite it, and shows a warning.
+- **The file can be read but is damaged:** the app copies it to `data.unreadable-<timestamp>-<id>.json`, checks that the copy matches the original byte for byte, and only then starts with empty records. If the copy can't be made, it stops saving instead.
+- **A save fails** (for example, the folder is read-only or disconnected): the menu bar panel shows the error, and the app retries every 30 seconds.
+
+While saving is stopped or failing, the Later inputs refuse new items instead of pretending to save them.
+
+There is no conflict resolution for multiple Macs sharing one folder. A later save can overwrite another Mac's changes.
+
+### Network and system changes
+
+Focus Guard has no analytics or tracking. Its only outbound request is the daily update check, which downloads `app/VERSION` (and, when a new version exists, `CHANGELOG.md`) from `raw.githubusercontent.com`; nothing about you or your usage is sent. Updates are installed only when you click **Update now**, and they build and run whatever is on the repository's `main` branch. **If you choose a folder synced by a cloud service (for example, Google Drive or iCloud Drive), that service uploads your records.**
+
+The app does not require administrator privileges or change `/etc/hosts`, network settings, or other system files.
+
+### Performance and blocking limits
+
+The app uses a single one-second timer for session updates and browser monitoring. Regular polling runs AppleScript only when a supported browser is in the foreground. The all-tab sweep runs at most two scripts per running browser: one to list tabs and one to redirect every matching tab at once. Closed windows and the menu bar panel are released from memory, so they don't keep redrawing in the background.
+
+Time on distracting sites is collected in memory and written to the data file at most every 30 seconds (and on quit). If the app crashes, up to 30 seconds of distraction time can be lost; other changes are saved within about a second.
+
+Browser scripts run synchronously on the main thread with a two-second timeout per script. An unresponsive browser can briefly freeze the interface.
+
+Focus Guard is a self-management aid. Quitting or force-quitting the app, denying automation permission, or using an unsupported browser bypasses blocking.
+
+Builds are ad-hoc signed, without a Developer ID signature or notarization. macOS may ask for automation permission again after a rebuild, and Gatekeeper may prevent a copied build from opening on another Mac. Building from source on each Mac avoids distributing a prebuilt app.
+
+## Uninstall
+
+**Settings → Delete Focus Guard…** turns off launch at login, moves the app to the Trash, and quits. Check the box to move your records folder to the Trash as well. Items in the Trash can still be restored until you empty it.
+
+To uninstall by hand:
+
+1. Disable launch at login in Settings if you enabled it.
+2. Open the main window from the menu bar and choose Quit.
+3. Delete `FocusGuard.app`.
+4. To remove your records, delete the active storage folder shown in Settings, including its `backups/` subfolder and any `data.unreadable-*.json` copies. If you changed locations, check previous folders for retained copies as well. Deleting files in a synced folder may also remove them from other devices.
+5. Optionally disable Focus Guard's browser permissions under **System Settings → Privacy & Security → Automation**.
+
+## Project structure
+
+```text
+app/
+  VERSION                  App version (shown in Settings)
+  build.sh                 Builds the app with swiftc; no Xcode project required
+  MakeIcon.swift           Draws the 🍅 app icon at build time
+  Sources/
+    main.swift             Menu bar, windows, global shortcut, and app startup
+    Store.swift            Timer, statistics, and JSON persistence
+    Models.swift           Data models and setting ranges
+    BrowserWatcher.swift   Browser monitoring and redirects through AppleScript
+    Server.swift           Loopback HTTP server for the blocked page
+    BlockedPage.swift      Blocked-page HTML, CSS, and JavaScript
+    Views.swift            SwiftUI views
+```
+
+## Credits
 
 Made by Anonymous, KAIST IS
 
-## 라이선스
+## License
 
 [MIT](LICENSE)

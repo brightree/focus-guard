@@ -173,7 +173,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
     }
 
     func showPlan(day: String) {
-        Windows.shared.show("plan", title: "할 일") { PlanView(day: day) }
+        Windows.shared.show("plan", title: L("할 일", "To-dos")) { PlanView(day: day) }
     }
 
     func phaseChanged(from old: Phase, to new: Phase) {
@@ -189,25 +189,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
 
     func showStart() {
         let last = store.today.log.last?.task ?? ""
-        Windows.shared.show("start", title: "집중 시작", floating: true) {
+        Windows.shared.show("start", title: L("집중 시작", "Start Focus"), floating: true) {
             StartView(task: last) { Windows.shared.close("start") }
         }
     }
 
     func showWrap() {
-        Windows.shared.show("wrap", title: "정리", floating: true) {
+        Windows.shared.show("wrap", title: L("정리", "Wrap-up"), floating: true) {
             WrapView { Windows.shared.close("wrap") }
         }
     }
 
     func showQuickCapture() {
-        Windows.shared.show("capture", title: "나중에 할 것", floating: true) {
+        Windows.shared.show("capture", title: L("나중에 할 것", "Later"), floating: true) {
             QuickCaptureView { Windows.shared.close("capture") }
         }
     }
 
     func showWarning(min: Int, site: String, bid: String) {
-        Windows.shared.show("warn", title: "딴짓 경고", floating: true) {
+        Windows.shared.show("warn", title: L("딴짓 경고", "Distraction Alert"), floating: true) {
             WarnView(min: min, site: site,
                      closeTab: { [weak self] in self?.watcher.closeFrontTab(bid: bid, ifStillOn: site); Windows.shared.close("warn") },
                      keep: { Windows.shared.close("warn") })
@@ -215,17 +215,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
     }
 
     func showStats() {
-        Windows.shared.show("stats", title: "학습 통계", resizable: true) { StatsView() }
+        Windows.shared.show("stats", title: L("학습 통계", "Study Stats"), resizable: true) { StatsView() }
     }
 
     func showUpdate() {
-        Windows.shared.show("update", title: "업데이트") { UpdateView { Windows.shared.close("update") } }
+        Windows.shared.show("update", title: L("업데이트", "Update")) { UpdateView { Windows.shared.close("update") } }
     }
 
     func showGiveUp() { presentGiveUp(thenQuit: false) }
 
     func presentGiveUp(thenQuit: Bool) {
-        Windows.shared.show("giveup", title: "포기하기", floating: true) {
+        Windows.shared.show("giveup", title: L("포기하기", "Give Up"), floating: true) {
             GiveUpView(onGiveUp: { [weak self] in
                 self?.store.stop()
                 if thenQuit { NSApp.terminate(nil) }
@@ -244,7 +244,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
     }
 
     func showSettings() {
-        Windows.shared.show("settings", title: "Focus Guard 설정") {
+        Windows.shared.show("settings", title: L("Focus Guard 설정", "Focus Guard Settings")) {
             SettingsView(chooseFolder: { [weak self] in self?.chooseFolder() },
                          revealFolder: { [weak self] in self?.revealFolder() },
                          toggleLogin: { [weak self] in self?.toggleLogin() },
@@ -273,19 +273,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
                 try SMAppService.mainApp.register()
             }
         } catch {
-            alert("자동 실행 설정에 실패했어요", "시스템 설정 → 일반 → 로그인 항목에서 FocusGuard를 직접 추가할 수 있어요.\n\(error.localizedDescription)")
+            alert(L("자동 실행 설정에 실패했어요", "Couldn't change launch at login"), L("시스템 설정 → 일반 → 로그인 항목에서 FocusGuard를 직접 추가할 수 있어요.\n\(error.localizedDescription)", "You can add Focus Guard yourself in System Settings → General → Login Items.\n\(error.localizedDescription)"))
         }
     }
 
     /// 앱을 휴지통으로 옮기고 종료한다. 원하면 기록 폴더도 휴지통으로 옮긴다 (되살릴 수 있음).
     func uninstall() {
         let a = NSAlert()
-        a.messageText = "Focus Guard를 삭제할까요?"
-        a.informativeText = "앱을 휴지통으로 옮기고 종료해요. 로그인 시 자동 실행도 꺼져요."
-        let withData = NSButton(checkboxWithTitle: "기록도 함께 휴지통으로 옮기기\n(\(store.dataDir.path))", target: nil, action: nil)
+        a.messageText = L("Focus Guard를 삭제할까요?", "Delete Focus Guard?")
+        a.informativeText = L("앱을 휴지통으로 옮기고 종료해요. 로그인 시 자동 실행도 꺼져요.", "This moves the app to the Trash and quits it. Launch at login will also be turned off.")
+        let withData = NSButton(checkboxWithTitle: L("기록도 함께 휴지통으로 옮기기\n(\(store.dataDir.path))", "Also move my data to the Trash\n(\(store.dataDir.path))"), target: nil, action: nil)
         a.accessoryView = withData
-        a.addButton(withTitle: "삭제")
-        a.addButton(withTitle: "취소")
+        a.addButton(withTitle: L("삭제", "Delete"))
+        a.addButton(withTitle: L("취소", "Cancel"))
         NSApp.activate(ignoringOtherApps: true)
         guard a.runModal() == .alertFirstButtonReturn else { return }
 
@@ -298,7 +298,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
             store.saveNow()
         }
         NSWorkspace.shared.recycle([Bundle.main.bundleURL]) { _, error in
-            if let error { self.alert("앱을 휴지통으로 옮기지 못했어요", error.localizedDescription) }
+            if let error { self.alert(L("앱을 휴지통으로 옮기지 못했어요", "Couldn't move the app to the Trash"), error.localizedDescription) }
             NSApp.terminate(nil)
         }
     }
@@ -308,10 +308,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
         p.canChooseDirectories = true
         p.canChooseFiles = false
         p.canCreateDirectories = true
-        p.prompt = "이 폴더에 저장"
+        p.prompt = L("이 폴더에 저장", "Save Here")
         NSApp.activate(ignoringOtherApps: true)
         if p.runModal() == .OK, let url = p.url, let err = store.changeDataDir(to: url) {
-            alert("저장 위치를 바꾸지 않았어요", err)
+            alert(L("저장 위치를 바꾸지 않았어요", "Storage location unchanged"), err)
         }
     }
 

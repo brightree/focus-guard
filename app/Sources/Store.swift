@@ -142,10 +142,10 @@ final class Store: ObservableObject {
                 d.timer.lastLogID = entry.id
             }
             enter(.wrap, minutes: settings.wrapMin)
-            notify("🍅 집중 완료! 정리 \(settings.wrapMin)분", "어디까지 했는지, 다음에 뭘 할지 적고 나중에 할 것을 훑어보세요.")
+            notify(L("🍅 집중 완료! 정리 \(settings.wrapMin)분", "🍅 Focus done! \(settings.wrapMin)-minute wrap-up"), L("어디까지 했는지, 다음에 뭘 할지 적고 나중에 할 것을 훑어보세요.", "Note where you left off and what's next, then skim your Later list."))
         case .wrap:
             enter(.rest, minutes: settings.breakMin)
-            notify("☕ 휴식 \(settings.breakMin)분", "화면에서 눈을 떼고 일어나 보세요.")
+            notify(L("☕ 휴식 \(settings.breakMin)분", "☕ \(settings.breakMin)-minute break"), L("화면에서 눈을 떼고 일어나 보세요.", "Step away from the screen and stretch."))
         case .rest:
             let old = phase
             mutate { d in
@@ -153,7 +153,7 @@ final class Store: ObservableObject {
                 d.timer.endTime = nil
                 d.timer.pausedRemaining = nil
             }
-            notify("휴식 끝", "다음 뽀모도로를 시작할 시간이에요. 딱 \(settings.focusMin)분만!")
+            notify(L("휴식 끝", "Break's over"), L("다음 뽀모도로를 시작할 시간이에요. 딱 \(settings.focusMin)분만!", "Time for the next Pomodoro. Just \(settings.focusMin) minutes!"))
             onPhaseChange?(old, .idle)
         case .idle:
             break
@@ -251,9 +251,20 @@ final class Store: ObservableObject {
         }
         s.sites = normalized(s.sites)
         s.allowSites = normalized(s.allowSites)
-        if s.stopPhrase.trimmingCharacters(in: .whitespaces).isEmpty { s.stopPhrase = Settings().stopPhrase }
+        if s.stopPhrase.trimmingCharacters(in: .whitespaces).isEmpty || Lang.allCases.contains(where: { s.stopPhrase == Settings.defaultStopPhrase($0) }) {
+            s.stopPhrase = Settings.defaultStopPhrase(s.language) // 기본 문장을 쓰던 중이면 언어에 맞춰 바꾼다
+        }
         mutate { $0.settings = s }
         return rejected
+    }
+
+    /// 언어를 바로 바꾼다. 기본 포기 문장을 쓰고 있었다면 그 언어의 기본 문장으로 바꾼다.
+    func setLanguage(_ lang: Lang) {
+        mutate { d in
+            let wasDefault = Lang.allCases.contains { d.settings.stopPhrase == Settings.defaultStopPhrase($0) }
+            d.settings.language = lang
+            if wasDefault { d.settings.stopPhrase = Settings.defaultStopPhrase(lang) }
+        }
     }
 
     /// "https://www.youtube.com/watch?v=1", "youtube.com:443" 등에서 도메인만 뽑는다. 도메인이 아니면 nil.
@@ -347,7 +358,7 @@ final class Store: ObservableObject {
         guard !isBlocking, step > 0, used >= step, used - streak!.warnedMin >= step else { return nil }
         streak!.warnedMin = used - used % step
         updateToday { $0.warnings += 1 }
-        notify("⏰ 딴짓 경고", "\(site)를 \(streak!.warnedMin)분째 쓰고 있어요.")
+        notify(L("⏰ 딴짓 경고", "⏰ Distraction alert"), L("\(site)를 \(streak!.warnedMin)분째 쓰고 있어요.", "You've been on \(site) for \(streak!.warnedMin) minutes."))
         return (streak!.warnedMin, site)
     }
 
@@ -450,7 +461,7 @@ final class Store: ObservableObject {
             return
         }
         guard let raw = try? Data(contentsOf: dataURL) else {
-            blockSaving("기록 파일을 읽지 못해서 원본을 지키려고 저장을 멈췄어요. 파일을 확인한 뒤 앱을 다시 켜주세요.")
+            blockSaving(L("기록 파일을 읽지 못해서 원본을 지키려고 저장을 멈췄어요. 파일을 확인한 뒤 앱을 다시 켜주세요.", "Couldn't read your data file, so saving is paused to protect it. Check the file, then restart the app."))
             return
         }
         do {
@@ -464,9 +475,9 @@ final class Store: ObservableObject {
                 guard try Data(contentsOf: copy) == raw else { throw CocoaError(.fileWriteUnknown) }
                 data = DataFile()
                 saveError = nil
-                notify("기록 파일이 손상돼 새로 시작해요", "원래 파일은 \(copy.lastPathComponent) 로 보관했어요.")
+                notify(L("기록 파일이 손상돼 새로 시작해요", "Your data file was damaged, so you are starting fresh"), L("원래 파일은 \(copy.lastPathComponent) 로 보관했어요.", "The original was kept as \(copy.lastPathComponent)."))
             } catch {
-                blockSaving("기록 파일이 손상됐는데 보관 복사본을 만들지 못해서 저장을 멈췄어요. 원본: \(dataURL.path)")
+                blockSaving(L("기록 파일이 손상됐는데 보관 복사본을 만들지 못해서 저장을 멈췄어요. 원본: \(dataURL.path)", "Your data file is damaged and a backup copy couldn't be made, so saving is paused. Original: \(dataURL.path)"))
             }
         }
     }
@@ -475,7 +486,7 @@ final class Store: ObservableObject {
         saveBlocked = true
         saveError = reason
         data = DataFile()
-        notify("기록을 저장하지 않고 있어요", reason)
+        notify(L("기록을 저장하지 않고 있어요", "Your data isn't being saved"), reason)
     }
 
     /// 변경이 계속 들어와도 최대 1초 안에 한 번은 저장된다.
@@ -498,7 +509,7 @@ final class Store: ObservableObject {
             try Self.encoder.encode(data).write(to: dataURL, options: .atomic)
         } catch {
             NSLog("FocusGuard: save failed: \(error)")
-            saveError = "기록을 저장하지 못했어요: \(error.localizedDescription)"
+            saveError = L("기록을 저장하지 못했어요: \(error.localizedDescription)", "Couldn't save your data: \(error.localizedDescription)")
             scheduleRetry()
             return false
         }
@@ -535,7 +546,7 @@ final class Store: ObservableObject {
     /// 실패하면 폴더를 바꾸지 않고 이유를 돌려준다.
     func changeDataDir(to dir: URL) -> String? {
         if !saveBlocked, !saveNow() {
-            return "지금 기록을 저장하지 못해서 폴더를 바꾸지 않았어요. \(saveError ?? "")"
+            return L("지금 기록을 저장하지 못해서 폴더를 바꾸지 않았어요.", "Couldn't save your current data, so the folder wasn't changed.") + " " + (saveError ?? "")
         }
         let old = dataDir, oldBlocked = saveBlocked, oldError = saveError
         dataDir = dir
@@ -544,7 +555,7 @@ final class Store: ObservableObject {
             if saveBlocked {
                 dataDir = old
                 load()
-                return "그 폴더의 기록 파일을 읽지 못해서 폴더를 바꾸지 않았어요."
+                return L("그 폴더의 기록 파일을 읽지 못해서 폴더를 바꾸지 않았어요.", "Couldn't read the data file in that folder, so the folder wasn't changed.")
             }
         } else {
             saveBlocked = false
@@ -552,7 +563,7 @@ final class Store: ObservableObject {
                 dataDir = old
                 saveBlocked = oldBlocked
                 saveError = oldError
-                return "새 폴더에 저장하지 못해서 폴더를 바꾸지 않았어요."
+                return L("새 폴더에 저장하지 못해서 폴더를 바꾸지 않았어요.", "Couldn't save to the new folder, so the folder wasn't changed.")
             }
         }
         UserDefaults.standard.set(dir.path, forKey: Self.dirKey)

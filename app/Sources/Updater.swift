@@ -57,7 +57,7 @@ final class Updater: ObservableObject {
             guard let self else { return }
             UserDefaults.standard.set(Date(), forKey: Self.lastCheckKey)
             guard let remote = text?.trimmingCharacters(in: .whitespacesAndNewlines), !remote.isEmpty else {
-                self.state = .failed("새 버전을 확인하지 못했어요. 인터넷 연결을 확인해 주세요.")
+                self.state = .failed(L("새 버전을 확인하지 못했어요. 인터넷 연결을 확인해 주세요.", "Couldn't check for updates. Check your internet connection."))
                 return
             }
             guard Self.isNewer(remote, than: self.current) else {
@@ -70,7 +70,7 @@ final class Updater: ObservableObject {
             }
             if UserDefaults.standard.string(forKey: Self.notifiedKey) != remote {
                 UserDefaults.standard.set(remote, forKey: Self.notifiedKey)
-                Store.shared.notify("🍅 새 버전 \(remote)이 나왔어요", "메뉴 막대 🍅 → 업데이트를 누르면 바로 설치돼요.")
+                Store.shared.notify(L("🍅 새 버전 \(remote)이 나왔어요", "🍅 Focus Guard \(remote) is available"), L("메뉴 막대 🍅 → 업데이트를 누르면 바로 설치돼요.", "Click 🍅 in the menu bar, then Update to install it."))
             }
         }
     }
@@ -78,7 +78,7 @@ final class Updater: ObservableObject {
     /// 최신 코드를 받아 빌드하고, 성공하면 새 버전으로 다시 켠다. 실패하면 지금 버전 그대로 둔다.
     func update() {
         guard let repo = repoDir else {
-            state = .failed("자동 업데이트는 README의 설치 명령으로 설치한 경우에만 돼요. README 명령을 다시 붙여넣어 주세요.")
+            state = .failed(L("자동 업데이트는 README의 설치 명령으로 설치한 경우에만 돼요. README 명령을 다시 붙여넣어 주세요.", "Automatic updates only work if you installed with the command in the README. Paste that command again to update."))
             return
         }
         state = .updating
@@ -87,7 +87,7 @@ final class Updater: ObservableObject {
             let (ok, log) = Self.shell("git pull -q && cd app && ./build.sh", in: repo)
             DispatchQueue.main.async {
                 guard ok else {
-                    self.state = .failed("업데이트하지 못했어요. 지금 버전은 그대로예요.\n" + log.suffix(400))
+                    self.state = .failed(L("업데이트하지 못했어요. 지금 버전은 그대로예요.\n", "Update failed. You're still on the current version.\n") + log.suffix(400))
                     return
                 }
                 // 이 앱이 꺼진 뒤 새 앱을 켜도록 맡겨 두고 종료한다 (포트가 겹치지 않게)

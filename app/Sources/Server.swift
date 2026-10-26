@@ -98,7 +98,7 @@ final class StateServer {
         var out: [String: Any] = [:]
 
         if requestLine.hasPrefix("GET /blocked") {
-            send(conn, status: status, type: "text/html", body: Data(blockedPageHTML.utf8))
+            send(conn, status: status, type: "text/html", body: Data(blockedPageHTML().utf8))
             return
         } else if requestLine.hasPrefix("GET /status") {
             out = statusJSON()
@@ -109,7 +109,7 @@ final class StateServer {
             } else if !store.canPersist {
                 // 저장이 막혀 있으면 받았다고 하지 않는다
                 status = "503 Service Unavailable"
-                out = ["error": store.saveError ?? "기록을 저장할 수 없는 상태예요."]
+                out = ["error": store.saveError ?? L("기록을 저장할 수 없는 상태예요.", "Saving is unavailable right now.")]
             } else {
                 store.addLater(text)
                 out = statusJSON()

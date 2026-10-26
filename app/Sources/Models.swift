@@ -1,5 +1,17 @@
 import Foundation
 
+// MARK: - 언어 (한국어 / English)
+
+enum Lang: String, Codable, CaseIterable {
+    case ko, en
+    /// 처음 켤 때는 맥의 언어를 따른다
+    static var system: Lang { Locale.preferredLanguages.first?.hasPrefix("ko") == true ? .ko : .en }
+    var locale: Locale { Locale(identifier: self == .ko ? "ko_KR" : "en_US") }
+}
+
+/// 화면 문구: 설정한 언어에 맞는 쪽을 고른다
+func L(_ ko: String, _ en: String) -> String { Store.shared.settings.language == .en ? en : ko }
+
 // 모든 기록은 data.json 한 파일에 저장된다. 필드가 추가돼도 옛 파일을 읽을 수 있도록
 // 디코딩은 전부 decodeIfPresent + 기본값으로 한다.
 
@@ -10,10 +22,10 @@ enum Phase: String, Codable {
     var isStudy: Bool { self == .focus || self == .wrap }
     var label: String {
         switch self {
-        case .idle: return "대기 중"
-        case .focus: return "집중 중"
-        case .wrap: return "정리 중"
-        case .rest: return "휴식 중"
+        case .idle: return L("대기 중", "Idle")
+        case .focus: return L("집중 중", "Focusing")
+        case .wrap: return L("정리 중", "Wrapping up")
+        case .rest: return L("휴식 중", "On a break")
         }
     }
     var icon: String {
@@ -30,7 +42,8 @@ struct Settings: Codable, Equatable {
     var wrapMin = 3
     var breakMin = 7
     var warnAfterMin = 10 // 집중 외 시간에 한 사이트를 연속으로 이만큼 쓰면 경고
-    var stopPhrase = "일해야 졸업하지"
+    var language = Lang.system
+    var stopPhrase = Settings.defaultStopPhrase(Lang.system)
     var sites = ["youtube.com", "linkedin.com", "instagram.com", "facebook.com", "x.com", "twitter.com", "reddit.com", "netflix.com"]
     /// 차단 목록의 하위 도메인이어도 막지 않는 사이트 (예: 공부하며 듣는 유튜브 뮤직)
     var allowSites = ["music.youtube.com"]
@@ -47,13 +60,16 @@ struct Settings: Codable, Equatable {
         wrapMin = try c.decodeIfPresent(Int.self, forKey: .wrapMin) ?? d.wrapMin
         breakMin = try c.decodeIfPresent(Int.self, forKey: .breakMin) ?? d.breakMin
         warnAfterMin = try c.decodeIfPresent(Int.self, forKey: .warnAfterMin) ?? d.warnAfterMin
-        stopPhrase = try c.decodeIfPresent(String.self, forKey: .stopPhrase) ?? d.stopPhrase
+        language = try c.decodeIfPresent(Lang.self, forKey: .language) ?? .ko // 이 기능 전부터 쓰던 기록은 한국어
+        stopPhrase = try c.decodeIfPresent(String.self, forKey: .stopPhrase) ?? Settings.defaultStopPhrase(language)
         sites = try c.decodeIfPresent([String].self, forKey: .sites) ?? d.sites
         allowSites = try c.decodeIfPresent([String].self, forKey: .allowSites) ?? d.allowSites
         trackStudyUsage = try c.decodeIfPresent(Bool.self, forKey: .trackStudyUsage) ?? d.trackStudyUsage
         morningPlan = try c.decodeIfPresent(Bool.self, forKey: .morningPlan) ?? d.morningPlan
         self = clamped()
     }
+
+    static func defaultStopPhrase(_ lang: Lang) -> String { lang == .en ? "Gotta work to graduate" : "일해야 졸업하지" }
 
     static let focusRange = 1...180
     static let wrapRange = 1...30
@@ -184,6 +200,7 @@ func dayKey(_ d: Date = Date()) -> String { dayKeyFormatter.string(from: d) }
 
 func fmtMinutes(_ sec: Double) -> String {
     let m = Int((sec / 60).rounded())
+    if Store.shared.settings.language == .en { return m >= 60 ? "\(m / 60)h \(m % 60)m" : "\(m) min" }
     return m >= 60 ? "\(m / 60)시간 \(m % 60)분" : "\(m)분"
 }
 

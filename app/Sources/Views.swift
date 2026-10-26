@@ -13,12 +13,13 @@ struct PopoverView: View {
     @ObservedObject private var updater = Updater.shared
     @State private var text = ""
     @State private var saved = false
+    @State private var askingPause = false
     @FocusState private var focused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Text(store.phase.label + (store.isPaused ? " · 일시정지" : "")).foregroundStyle(.secondary)
+                Text(store.phase.label + (store.isPaused ? L(" · 일시정지", " · Paused") : "")).foregroundStyle(.secondary)
                 Spacer()
                 if store.phase != .idle {
                     Text(fmtClock(store.remaining)).font(.title2.bold().monospacedDigit())
@@ -28,28 +29,50 @@ struct PopoverView: View {
                 Text("📌 \(store.timer.task)").lineLimit(2)
             }
 
+            // 집중 중 일시정지 전에 한 번 묻는다
+            if askingPause {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(L("너가 쉴 자격이 있을까?", "Have you earned this break?")).font(.headline)
+                    HStack {
+                        Button { askingPause = false } label: { Text(L("계속 집중", "Keep Focusing")).frame(maxWidth: .infinity) }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.red)
+                            .keyboardShortcut(.defaultAction)
+                        Button {
+                            askingPause = false
+                            togglePause()
+                        } label: { Text(L("그래도 일시정지", "Pause Anyway")).frame(maxWidth: .infinity) }
+                    }
+                    .controlSize(.large)
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.red.opacity(0.08)))
+            } else {
             // 진행 중: [일시정지/재개] [앱 열기] [중지] — 앞의 둘은 같은 너비, 중지는 가장 작게
             HStack {
                 if store.phase == .idle {
-                    Button(action: primary) { Text("🍅 시작").frame(maxWidth: .infinity) }
+                    Button(action: primary) { Text(L("🍅 시작", "🍅 Start")).frame(maxWidth: .infinity) }
                         .buttonStyle(.borderedProminent)
                         .tint(.red)
                 } else {
-                    Button(action: togglePause) {
-                        Label(store.isPaused ? "재개" : "일시정지", systemImage: store.isPaused ? "play.fill" : "pause.fill")
+                    Button {
+                        if store.phase == .focus, !store.isPaused { askingPause = true } else { togglePause() }
+                    } label: {
+                        Label(store.isPaused ? L("재개", "Resume") : L("일시정지", "Pause"), systemImage: store.isPaused ? "play.fill" : "pause.fill")
                             .frame(maxWidth: .infinity)
                     }
-                    .help(store.phase == .focus ? "집중 중에는 일시정지해도 차단이 유지돼요" : "")
+                    .help(store.phase == .focus ? L("집중 중에는 일시정지해도 차단이 유지돼요", "Sites stay blocked while focus is paused") : "")
                 }
-                Button(action: openApp) { Text("앱 열기").frame(maxWidth: .infinity) }
+                Button(action: openApp) { Text(L("앱 열기", "Open App")).frame(maxWidth: .infinity) }
                 if store.phase != .idle {
                     Button(stopTitle, action: primary)
                 }
             }
             .controlSize(.large)
+            }
 
             VStack(alignment: .leading, spacing: 4) {
-                TextField("💭 나중에 할 것 적기 (Enter)", text: $text)
+                TextField(L("💭 나중에 할 것 적기 (Enter)", "💭 Jot down for later (Enter)"), text: $text)
                     .textFieldStyle(.roundedBorder)
                     .focused($focused)
                     .onSubmit {
@@ -60,7 +83,7 @@ struct PopoverView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { close() }
                     }
                 if saved {
-                    Text("✓ 적어뒀어요. 다시 집중!").font(.caption).foregroundStyle(.green)
+                    Text(L("✓ 적어뒀어요. 다시 집중!", "✓ Saved. Back to focus!")).font(.caption).foregroundStyle(.green)
                 }
             }
 
@@ -70,9 +93,9 @@ struct PopoverView: View {
 
             if let v = updater.latest {
                 HStack {
-                    Text("🆕 새 버전 \(v)").font(.callout.bold())
+                    Text(L("🆕 새 버전 \(v)", "🆕 Version \(v) available")).font(.callout.bold())
                     Spacer()
-                    Button("업데이트", action: openUpdate).controlSize(.small)
+                    Button(L("업데이트", "Update"), action: openUpdate).controlSize(.small)
                 }
                 .padding(8)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.12)))
@@ -80,9 +103,9 @@ struct PopoverView: View {
 
             if store.browserAccessDenied {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("⚠️ 브라우저 제어 권한이 꺼져 있어서 사이트 차단이 안 돼요.")
+                    Text(L("⚠️ 브라우저 제어 권한이 꺼져 있어서 사이트 차단이 안 돼요.", "⚠️ Browser control is off, so sites can't be blocked."))
                         .font(.caption).fixedSize(horizontal: false, vertical: true)
-                    Button("자동화 설정 열기") {
+                    Button(L("자동화 설정 열기", "Open Automation Settings")) {
                         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!)
                     }
                     .controlSize(.small)
@@ -96,8 +119,8 @@ struct PopoverView: View {
 
     var stopTitle: String {
         switch store.phase {
-        case .wrap: return "완료"
-        default: return "중지"
+        case .wrap: return L("완료", "Done")
+        default: return L("중지", "Stop")
         }
     }
 }
@@ -113,12 +136,12 @@ struct WarnView: View {
     var body: some View {
         VStack(spacing: 12) {
             Text("⏰").font(.system(size: 40))
-            Text("\(site)를 \(min)분째 쓰고 있어요").font(.title3.bold())
-            Text("지금 이게 정말 하려던 일인가요? 뽀모도로 하나만 시작해볼까요?")
+            Text(L("\(site)를 \(min)분째 쓰고 있어요", "You've been on \(site) for \(min) minutes")).font(.title3.bold())
+            Text(L("지금 이게 정말 하려던 일인가요? 뽀모도로 하나만 시작해볼까요?", "Is this what you meant to be doing? How about one Pomodoro?"))
                 .foregroundStyle(.secondary).multilineTextAlignment(.center)
             HStack {
-                Button("알고 계속 보기", action: keep)
-                Button("이 탭 닫기", action: closeTab).keyboardShortcut(.defaultAction)
+                Button(L("알고 계속 보기", "Keep Browsing"), action: keep)
+                Button(L("이 탭 닫기", "Close This Tab"), action: closeTab).keyboardShortcut(.defaultAction)
             }
             .controlSize(.large)
         }
@@ -135,10 +158,10 @@ struct UpdateView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("🍅 새 버전 \(updater.latest ?? "")").font(.title3.bold())
-            Text("지금 버전 \(updater.current)").foregroundStyle(.secondary)
+            Text(L("🍅 새 버전 ", "🍅 Version ") + (updater.latest ?? "") + L("", " is available")).font(.title3.bold())
+            Text(L("지금 버전 \(updater.current)", "You have \(updater.current)")).foregroundStyle(.secondary)
             ScrollView {
-                Text(updater.notes.isEmpty ? "바뀐 내용을 불러오는 중…" : updater.notes)
+                Text(updater.notes.isEmpty ? L("바뀐 내용을 불러오는 중…", "Loading what's new…") : updater.notes)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
             }
@@ -147,7 +170,7 @@ struct UpdateView: View {
             .background(RoundedRectangle(cornerRadius: 8).fill(.background.secondary))
             switch updater.state {
             case .updating:
-                HStack { ProgressView().controlSize(.small); Text("받아서 빌드하는 중… (1분 정도) 끝나면 자동으로 다시 켜져요") }
+                HStack { ProgressView().controlSize(.small); Text(L("받아서 빌드하는 중… (1분 정도) 끝나면 자동으로 다시 켜져요", "Downloading and building… (about a minute). The app restarts when it's done.")) }
             case .failed(let msg):
                 Text(msg).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
             default:
@@ -155,8 +178,8 @@ struct UpdateView: View {
             }
             HStack {
                 Spacer()
-                Button("나중에", action: close).keyboardShortcut(.cancelAction)
-                Button("지금 업데이트") { updater.update() }
+                Button(L("나중에", "Later"), action: close).keyboardShortcut(.cancelAction)
+                Button(L("지금 업데이트", "Update Now")) { updater.update() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(updater.state == .updating || updater.latest == nil)
             }
@@ -176,16 +199,16 @@ struct StartView: View {
     var body: some View {
         let s = store.settings
         VStack(alignment: .leading, spacing: 12) {
-            Text("이번 \(s.focusMin)분 동안 무엇을 할까요?").font(.title3.bold())
+            Text(L("이번 \(s.focusMin)분 동안 무엇을 할까요?", "What will you work on for the next \(s.focusMin) minutes?")).font(.title3.bold())
             if !store.lastNote.isEmpty {
-                Text("지난 정리 메모: \(store.lastNote)").font(.callout).foregroundStyle(.secondary)
+                Text(L("지난 정리 메모: \(store.lastNote)", "Last wrap-up note: \(store.lastNote)")).font(.callout).foregroundStyle(.secondary)
             }
-            TextField("구체적으로 한 줄 (예: pset1 3번 회귀 결과 해석)", text: $task)
+            TextField(L("구체적으로 한 줄 (예: pset1 3번 회귀 결과 해석)", "One specific thing (e.g., interpret the regression results for Q3)"), text: $task)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(start)
             let picks = store.today.todos.filter { !$0.done && $0.kind != .other }.prefix(5)
             if !picks.isEmpty {
-                Text("오늘 할 일에서 고르기").font(.caption).foregroundStyle(.secondary)
+                Text(L("오늘 할 일에서 고르기", "Pick from today's to-dos")).font(.caption).foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(picks)) { item in
                         Button((item.kind == .must ? "🔥 " : "") + item.text) { task = item.text }
@@ -194,12 +217,12 @@ struct StartView: View {
                     }
                 }
             }
-            Text("집중 \(s.focusMin)분 → 정리 \(s.wrapMin)분 → 휴식 \(s.breakMin)분 · 집중·정리 중에는 사이트가 차단돼요")
+            Text(L("집중 \(s.focusMin)분 → 정리 \(s.wrapMin)분 → 휴식 \(s.breakMin)분 · 집중·정리 중에는 사이트가 차단돼요", "Focus \(s.focusMin) min → wrap up \(s.wrapMin) min → break \(s.breakMin) min · Sites are blocked during focus and wrap-up"))
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Spacer()
-                Button("취소", action: close).keyboardShortcut(.cancelAction)
-                Button("🍅 집중 시작", action: start)
+                Button(L("취소", "Cancel"), action: close).keyboardShortcut(.cancelAction)
+                Button(L("🍅 집중 시작", "🍅 Start Focus"), action: start)
                     .keyboardShortcut(.defaultAction)
                     .disabled(task.trimmingCharacters(in: .whitespaces).isEmpty)
             }
@@ -220,9 +243,9 @@ struct StartView: View {
 extension TodoKind {
     var title: String {
         switch self {
-        case .must: return "반드시 할 일"
-        case .nice: return "하면 좋은 일"
-        case .other: return "기타 업무"
+        case .must: return L("반드시 할 일", "Must do")
+        case .nice: return L("하면 좋은 일", "Nice to do")
+        case .other: return L("기타 업무", "Other")
         }
     }
     var symbol: String {
@@ -241,9 +264,9 @@ extension TodoKind {
     }
     var placeholder: String {
         switch self {
-        case .must: return "꼭 끝낼 일 추가 (1~3개 추천)"
-        case .nice: return "하면 좋은 일 추가"
-        case .other: return "기타 업무 추가"
+        case .must: return L("꼭 끝낼 일 추가 (1~3개 추천)", "Add a must-do (1–3 is plenty)")
+        case .nice: return L("하면 좋은 일 추가", "Add a nice-to-do")
+        case .other: return L("기타 업무 추가", "Add another task")
         }
     }
 }
@@ -274,7 +297,7 @@ struct PlanView: View {
                     }
                     Button { move(1) } label: { Image(systemName: "chevron.right") }
                     Spacer()
-                    if day != today { Button("오늘") { day = today } }
+                    if day != today { Button(L("오늘", "Today")) { day = today } }
                     ProgressRing(progress: todos.isEmpty ? 0 : Double(doneCount) / Double(todos.count))
                 }
                 .buttonStyle(.borderless)
@@ -284,9 +307,9 @@ struct PlanView: View {
                 if day >= today && todos.isEmpty && !carry.isEmpty {
                     HStack {
                         Image(systemName: "arrow.uturn.forward.circle.fill").foregroundStyle(.orange)
-                        Text("지난번에 못 한 일 \(carry.count)개가 있어요")
+                        Text(L("지난번에 못 한 일 \(carry.count)개가 있어요", "\(carry.count) left over from last time"))
                         Spacer()
-                        Button("가져오기") { withAnimation { store.carryOver(to: day) } }
+                        Button(L("가져오기", "Bring Over")) { withAnimation { store.carryOver(to: day) } }
                     }
                     .padding(12)
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color.orange.opacity(0.12)))
@@ -309,23 +332,23 @@ struct PlanView: View {
     }
 
     private func subtitle(todos: [TodoItem], done: Int, today: String) -> String {
-        if !todos.isEmpty { return "\(todos.count)개 중 \(done)개 완료" }
-        if day == today { return "오늘 할 일을 정해볼까요?" }
-        return day > today ? "이 날 할 일을 미리 적어둘까요?" : "이 날은 적은 할 일이 없어요"
+        if !todos.isEmpty { return L("\(todos.count)개 중 \(done)개 완료", "\(done) of \(todos.count) done") }
+        if day == today { return L("오늘 할 일을 정해볼까요?", "What's on your plate today?") }
+        return day > today ? L("이 날 할 일을 미리 적어둘까요?", "Plan this day ahead?") : L("이 날은 적은 할 일이 없어요", "Nothing was planned for this day")
     }
 }
 
 /// "10월 27일 화요일"
 func dayTitle(_ key: String) -> String {
     guard let d = dayKeyFormatter.date(from: key) else { return key }
-    return d.formatted(.dateTime.month().day().weekday(.wide).locale(Locale(identifier: "ko_KR")))
+    return d.formatted(.dateTime.month().day().weekday(.wide).locale(Store.shared.settings.language.locale))
 }
 
 /// 오늘 · 내일 · 어제 (그 외엔 nil)
 func relativeLabel(_ key: String, today: String) -> String? {
     guard let d = dayKeyFormatter.date(from: key), let t = dayKeyFormatter.date(from: today),
           let diff = Calendar.current.dateComponents([.day], from: t, to: d).day else { return nil }
-    return [-1: "어제", 0: "오늘", 1: "내일"][diff]
+    return [-1: L("어제", "Yesterday"), 0: L("오늘", "Today"), 1: L("내일", "Tomorrow")][diff]
 }
 
 struct ProgressRing: View {
@@ -421,7 +444,7 @@ struct TodoRow: View {
             }
             .buttonStyle(.plain)
             .opacity(hover ? 1 : 0)
-            .help("삭제")
+            .help(L("삭제", "Delete"))
         }
         .padding(.vertical, 7)
         .contentShape(Rectangle())
@@ -440,7 +463,7 @@ struct WrapView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("📝 정리 시간").font(.title3.bold())
+                Text(L("📝 정리 시간", "📝 Wrap-up")).font(.title3.bold())
                 Spacer()
                 if store.phase == .wrap {
                     Text(fmtClock(store.remaining)).font(.title3.monospacedDigit()).foregroundStyle(.orange)
@@ -449,7 +472,7 @@ struct WrapView: View {
             if !store.timer.task.isEmpty {
                 Text("📌 \(store.timer.task)").foregroundStyle(.secondary)
             }
-            Text("어디까지 했고, 다음엔 뭘 하나요?").font(.headline)
+            Text(L("어디까지 했고, 다음엔 뭘 하나요?", "Where did you leave off, and what's next?")).font(.headline)
             TextEditor(text: $note)
                 .font(.body)
                 .frame(height: 80)
@@ -457,9 +480,9 @@ struct WrapView: View {
                 .onChange(of: note) { _, new in store.saveNote(new) }
 
             let open = store.openLater
-            Text("💭 나중에 할 것 \(open.count)개 — 처리한 건 체크").font(.headline)
+            Text(L("💭 나중에 할 것 \(open.count)개 — 처리한 건 체크", "💭 Later (\(open.count)) — check off what's handled")).font(.headline)
             if open.isEmpty {
-                Text("없음 👏").foregroundStyle(.secondary)
+                Text(L("없음 👏", "Nothing here 👏")).foregroundStyle(.secondary)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 6) {
@@ -475,7 +498,7 @@ struct WrapView: View {
             }
             HStack {
                 Spacer()
-                Button("정리 완료 → 휴식") {
+                Button(L("정리 완료 → 휴식", "Done → Start Break")) {
                     store.saveNote(note)
                     store.finishWrap()
                     close()
@@ -499,7 +522,7 @@ struct QuickCaptureView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TextField("💭 떠오른 생각을 적고 다시 공부로", text: $text)
+            TextField(L("💭 떠오른 생각을 적고 다시 공부로", "💭 Write it down and get back to work"), text: $text)
                 .textFieldStyle(.roundedBorder)
                 .font(.title3)
                 .onSubmit {
@@ -511,10 +534,10 @@ struct QuickCaptureView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { close() }
                 }
             if let err = store.saveError {
-                Text("⚠️ 지금은 저장할 수 없어요. \(err)").font(.caption).foregroundStyle(.red)
+                Text(L("⚠️ 지금은 저장할 수 없어요. \(err)", "⚠️ Can't save right now. \(err)")).font(.caption).foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Text(saved ? "✓ 적어뒀어요. 이제 내려놓고 다시 집중!" : "Enter 저장 · Esc 닫기 · 정리 시간에 다시 보여드려요")
+                Text(saved ? L("✓ 적어뒀어요. 이제 내려놓고 다시 집중!", "✓ Saved. Let it go and get back to it!") : L("Enter 저장 · Esc 닫기 · 정리 시간에 다시 보여드려요", "Enter to save · Esc to close · You'll see it again at wrap-up"))
                     .font(.caption)
                     .foregroundStyle(saved ? .green : .secondary)
             }
@@ -538,23 +561,23 @@ struct GiveUpView: View {
         let matches = Self.normalize(phrase) == Self.normalize(target)
         let canGiveUp = matches
         VStack(alignment: .leading, spacing: 12) {
-            Text("정말 그만둘까요?").font(.title3.bold())
-            Text("하고 싶은 게 생겼다면 ⌥⇧L로 적어두고 계속해도 돼요. 그래도 그만두려면 아래 문장을 그대로 입력하세요.")
+            Text(L("정말 그만둘까요?", "Give up on this session?")).font(.title3.bold())
+            Text(L("하고 싶은 게 생겼다면 ⌥⇧L로 적어두고 계속해도 돼요. 그래도 그만두려면 아래 문장을 그대로 입력하세요.", "If something came up, jot it down with ⌥⇧L and keep going. To quit anyway, type the phrase below."))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             // 입력하면 사라지는 안내 글자 대신, 따라 칠 문장을 항상 보여준다
             Text(target).font(.headline).textSelection(.enabled)
-            TextField("위 문장을 그대로 입력", text: $phrase)
+            TextField(L("위 문장을 그대로 입력", "Type the phrase above"), text: $phrase)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit { if canGiveUp { giveUp() } }
-            Text(phrase.isEmpty ? " " : (matches ? "✓ 일치해요" : "아직 달라요 (띄어쓰기·문장부호는 상관없어요)"))
+            Text(phrase.isEmpty ? " " : (matches ? L("✓ 일치해요", "✓ Matches") : L("아직 달라요 (띄어쓰기·문장부호는 상관없어요)", "Not yet (spacing and punctuation don't matter)")))
                 .font(.caption)
                 .foregroundStyle(matches ? .green : .secondary)
             HStack {
                 Spacer()
                 // Enter 는 입력칸에서 포기를 처리하므로, 계속하기는 Esc 로 연결한다
-                Button("계속 집중하기", action: close).keyboardShortcut(.cancelAction)
-                Button("포기", action: giveUp).disabled(!canGiveUp)
+                Button(L("계속 집중하기", "Keep Focusing"), action: close).keyboardShortcut(.cancelAction)
+                Button(L("포기", "Give Up"), action: giveUp).disabled(!canGiveUp)
             }
         }
         .padding(20)
@@ -580,7 +603,9 @@ private let weekCal: Calendar = {
     return c
 }()
 
-private let weekdaySymbols = ["일", "월", "화", "수", "목", "금", "토"]
+private var weekdaySymbols: [String] {
+    Store.shared.settings.language == .en ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["일", "월", "화", "수", "목", "금", "토"]
+}
 
 struct DashboardView: View {
     @EnvironmentObject var store: Store
@@ -601,11 +626,11 @@ struct DashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Button("📋 할 일") { openPlan(dayKey()) }
-                    Button("📊 통계", action: openStats)
-                    Button("⚙︎ 설정", action: openSettings)
+                    Button(L("📋 할 일", "📋 To-dos")) { openPlan(dayKey()) }
+                    Button(L("📊 통계", "📊 Stats"), action: openStats)
+                    Button(L("⚙︎ 설정", "⚙︎ Settings"), action: openSettings)
                     Spacer()
-                    Button("종료", action: quit)
+                    Button(L("종료", "Quit"), action: quit)
                 }
                 .controlSize(.large)
 
@@ -614,7 +639,7 @@ struct DashboardView: View {
                     Text(weekTitle(dates)).font(.title3.bold())
                     Button { changeWeek(1) } label: { Image(systemName: "chevron.right") }
                     Spacer()
-                    Text("이번 주 공부 \(fmtMinutes(secs.reduce(0, +))) · 🍅 \(sessions)개")
+                    Text(L("이번 주 공부 \(fmtMinutes(secs.reduce(0, +))) · 🍅 \(sessions)개", "This week: \(fmtMinutes(secs.reduce(0, +))) · 🍅 \(sessions)"))
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
@@ -631,16 +656,16 @@ struct DashboardView: View {
                 HStack {
                     Text("Focus Guard v\(updater.current) · \(madeBy)").foregroundStyle(.secondary)
                     switch updater.state {
-                    case .checking: Text("확인 중…").foregroundStyle(.secondary)
-                    case .upToDate: Text("최신 버전이에요 ✓").foregroundStyle(.secondary)
+                    case .checking: Text(L("확인 중…", "Checking…")).foregroundStyle(.secondary)
+                    case .upToDate: Text(L("최신 버전이에요 ✓", "You're up to date ✓")).foregroundStyle(.secondary)
                     case .failed(let msg): Text(msg).foregroundStyle(.red).lineLimit(2)
                     default: EmptyView()
                     }
                     Spacer()
                     if let v = updater.latest {
-                        Button("업데이트 \(v)", action: openUpdate).buttonStyle(.borderedProminent)
+                        Button(L("업데이트 \(v)", "Update to \(v)"), action: openUpdate).buttonStyle(.borderedProminent)
                     } else {
-                        Button("업데이트 확인") { updater.check() }
+                        Button(L("업데이트 확인", "Check for Updates")) { updater.check() }
                     }
                 }
                 .font(.callout)
@@ -658,7 +683,7 @@ struct DashboardView: View {
 
     func weekTitle(_ dates: [Date]) -> String {
         let f = { (d: Date) in "\(weekCal.component(.month, from: d))/\(weekCal.component(.day, from: d))" }
-        return (weekOffset == 0 ? "이번 주 " : "") + "\(f(dates[0])) – \(f(dates[6]))"
+        return (weekOffset == 0 ? L("이번 주 ", "This week ") : "") + "\(f(dates[0])) – \(f(dates[6]))"
     }
 
     func changeWeek(_ delta: Int) {
@@ -668,16 +693,16 @@ struct DashboardView: View {
     }
 
     var laterCard: some View {
-        Card(title: "💭 나중에 할 것") {
+        Card(title: L("💭 나중에 할 것", "💭 Later")) {
             HStack {
-                TextField("새로 적기 (Enter)", text: $newLater)
+                TextField(L("새로 적기 (Enter)", "Add new (Enter)"), text: $newLater)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { store.addLater(newLater); newLater = "" }
-                Button("완료 항목 지우기") { store.clearDoneLater() }
+                Button(L("완료 항목 지우기", "Clear Completed")) { store.clearDoneLater() }
             }
             let items = store.data.later.sorted { ($0.done ? 1 : 0, -$0.created.timeIntervalSince1970) < ($1.done ? 1 : 0, -$1.created.timeIntervalSince1970) }
             if items.isEmpty {
-                Text("공부 중 떠오른 생각을 ⌥⇧L로 적으면 여기 모여요.").foregroundStyle(.secondary)
+                Text(L("공부 중 떠오른 생각을 ⌥⇧L로 적으면 여기 모여요.", "Thoughts you jot down with ⌥⇧L while studying show up here.")).foregroundStyle(.secondary)
             }
             ForEach(items) { item in
                 HStack(alignment: .top) {
@@ -686,11 +711,11 @@ struct DashboardView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.text).strikethrough(item.done).foregroundStyle(item.done ? .secondary : .primary)
                         Text(item.created.formatted(date: .abbreviated, time: .shortened)
-                             + (item.during.isEmpty ? "" : " · \"\(item.during)\" 하다가"))
+                             + (item.during.isEmpty ? "" : L(" · \"\(item.during)\" 하다가", " · during \"\(item.during)\"")))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("삭제") { store.deleteLater(item.id) }.buttonStyle(.borderless).foregroundStyle(.secondary)
+                    Button(L("삭제", "Delete")) { store.deleteLater(item.id) }.buttonStyle(.borderless).foregroundStyle(.secondary)
                 }
             }
         }
@@ -787,19 +812,19 @@ struct DayDetail: View {
             Text(dayTitle(key) + (relativeLabel(key, today: today).map { " (\($0))" } ?? "")).font(.title3.bold())
             if !isFuture {
                 HStack(spacing: 10) {
-                    Kpi(value: fmtMinutes(store.studySec(for: key)), label: "공부")
-                    Kpi(value: "\(day.sessions)", label: "완료한 뽀모도로")
-                    Kpi(value: fmtMinutes(day.distractTotal), label: "딴짓")
+                    Kpi(value: fmtMinutes(store.studySec(for: key)), label: L("공부", "Study"))
+                    Kpi(value: "\(day.sessions)", label: L("완료한 뽀모도로", "Pomodoros done"))
+                    Kpi(value: fmtMinutes(day.distractTotal), label: L("딴짓", "Distractions"))
                 }
             }
 
-            Card(title: "할 일") {
+            Card(title: L("할 일", "To-dos")) {
                 HStack {
                     if day.todos.isEmpty {
-                        Text(isFuture ? "아직 적은 할 일이 없어요." : "이 날은 적은 할 일이 없어요.").foregroundStyle(.secondary)
+                        Text(isFuture ? L("아직 적은 할 일이 없어요.", "No to-dos yet.") : L("이 날은 적은 할 일이 없어요.", "No to-dos for this day.")).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button(day.todos.isEmpty ? "✏️ 할 일 적기" : "✏️ 편집") { openPlan(key) }
+                    Button(day.todos.isEmpty ? L("✏️ 할 일 적기", "✏️ Add To-dos") : L("✏️ 편집", "✏️ Edit")) { openPlan(key) }
                 }
                 ForEach(TodoKind.allCases, id: \.self) { kind in
                     let items = day.todos.filter { $0.kind == kind }
@@ -824,13 +849,13 @@ struct DayDetail: View {
             }
 
             if !isFuture {
-                Card(title: "한 일") {
+                Card(title: L("한 일", "Sessions")) {
                     if day.log.isEmpty {
-                        Text("이 날은 뽀모도로 기록이 없어요.").foregroundStyle(.secondary)
+                        Text(L("이 날은 뽀모도로 기록이 없어요.", "No Pomodoros this day.")).foregroundStyle(.secondary)
                     }
                     ForEach(day.log) { l in
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("\(l.done ? "🍅" : "✖️") \(l.end.formatted(date: .omitted, time: .shortened)) — \(l.task.isEmpty ? "(할 일 없음)" : l.task) \(l.done ? "(\(l.minutes ?? 0)분)" : "(포기)")")
+                            Text("\(l.done ? "🍅" : "✖️") \(l.end.formatted(date: .omitted, time: .shortened)) — \(l.task.isEmpty ? L("(할 일 없음)", "(no task)") : l.task) \(l.done ? L("(\(l.minutes ?? 0)분)", "(\(l.minutes ?? 0) min)") : L("(포기)", "(gave up)"))")
                             if !l.note.isEmpty {
                                 Text("📝 \(l.note)").font(.callout).foregroundStyle(.secondary)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -840,10 +865,10 @@ struct DayDetail: View {
                     }
                 }
 
-                Card(title: "딴짓 사이트") {
+                Card(title: L("딴짓 사이트", "Distracting sites")) {
                     let entries = day.distractSec.sorted { $0.value > $1.value }
                     if entries.isEmpty {
-                        Text("딴짓 기록이 없어요 👏").foregroundStyle(.secondary)
+                        Text(L("딴짓 기록이 없어요 👏", "No distractions 👏")).foregroundStyle(.secondary)
                     }
                     let maxV = entries.first?.value ?? 1
                     ForEach(entries, id: \.key) { site, sec in
@@ -857,7 +882,7 @@ struct DayDetail: View {
                             Text(fmtMinutes(sec)).monospacedDigit().foregroundStyle(.secondary).frame(width: 70, alignment: .trailing)
                         }
                     }
-                    Text("연속 사용 경고 \(day.warnings)회 · 중도 포기 \(day.abandoned)회")
+                    Text(L("연속 사용 경고 \(day.warnings)회 · 중도 포기 \(day.abandoned)회", "\(day.warnings) distraction alerts · \(day.abandoned) sessions abandoned"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -869,7 +894,10 @@ struct DayDetail: View {
 
 struct StatsView: View {
     @EnvironmentObject var store: Store
-    enum Span: String, CaseIterable { case day = "일", week = "주" }
+    enum Span: CaseIterable {
+        case day, week
+        var label: String { self == .day ? L("일", "Day") : L("주", "Week") }
+    }
     @State private var span: Span = .day
     @State private var offset = 0 // 0 = 오늘 / 이번 주, -1 = 어제 / 지난 주 …
 
@@ -885,7 +913,7 @@ struct StatsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Picker("", selection: $span) {
-                        ForEach(Span.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        ForEach(Span.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
@@ -900,23 +928,23 @@ struct StatsView: View {
                 .buttonStyle(.borderless)
 
                 HStack(spacing: 10) {
-                    Kpi(value: fmtMinutes(study), label: "공부 시간")
-                    Kpi(value: "\(sessions)", label: "완료한 뽀모도로")
-                    Kpi(value: tries == 0 ? "–" : "\(Int((Double(sessions) / Double(tries) * 100).rounded()))%", label: "집중 성공률")
+                    Kpi(value: fmtMinutes(study), label: L("공부 시간", "Study time"))
+                    Kpi(value: "\(sessions)", label: L("완료한 뽀모도로", "Pomodoros done"))
+                    Kpi(value: tries == 0 ? "–" : "\(Int((Double(sessions) / Double(tries) * 100).rounded()))%", label: L("집중 성공률", "Focus success rate"))
                     if span == .week {
                         let studied = keys.filter { store.studySec(for: $0) >= 60 }.count
-                        Kpi(value: "\(studied)/7일", label: "공부한 날")
+                        Kpi(value: L("\(studied)/7일", "\(studied)/7 days"), label: L("공부한 날", "Days studied"))
                     } else {
-                        Kpi(value: fmtMinutes(days.map(\.distractTotal).reduce(0, +)), label: "딴짓")
+                        Kpi(value: fmtMinutes(days.map(\.distractTotal).reduce(0, +)), label: L("딴짓", "Distractions"))
                     }
                 }
 
-                TopCard(title: "집중 중 많이 쓴 앱", items: usage.apps, color: .orange)
-                TopCard(title: "집중 중 많이 본 사이트", items: usage.sites, color: .blue)
+                TopCard(title: L("집중 중 많이 쓴 앱", "Top apps while focusing"), items: usage.apps, color: .orange)
+                TopCard(title: L("집중 중 많이 본 사이트", "Top sites while focusing"), items: usage.sites, color: .blue)
 
                 Text(store.settings.trackStudyUsage
-                     ? "집중·정리 중(일시정지·자리 비움 제외) 맨 앞에 있던 앱과 사이트 도메인만 세요. 이 맥에만 저장돼요."
-                     : "앱·사이트 기록이 꺼져 있어요. 설정에서 켤 수 있어요.")
+                     ? L("집중·정리 중(일시정지·자리 비움 제외) 맨 앞에 있던 앱과 사이트 도메인만 세요. 이 맥에만 저장돼요.", "Counts only the frontmost app and site domain during focus and wrap-up (not while paused or away). Stored only on this Mac.")
+                     : L("앱·사이트 기록이 꺼져 있어요. 설정에서 켤 수 있어요.", "App and site tracking is off. You can turn it on in Settings."))
                     .font(.caption).foregroundStyle(.secondary)
             }
             .padding(20)
@@ -944,7 +972,7 @@ struct StatsView: View {
             guard let d = dayKeyFormatter.date(from: k) else { return k }
             return "\(Calendar.current.component(.month, from: d))/\(Calendar.current.component(.day, from: d))"
         }
-        return (offset == 0 ? "이번 주 " : "") + "\(md(keys[0])) – \(md(keys[6]))"
+        return (offset == 0 ? L("이번 주 ", "This week ") : "") + "\(md(keys[0])) – \(md(keys[6]))"
     }
 }
 
@@ -959,7 +987,7 @@ struct TopCard: View {
         let top = items.sorted { $0.value > $1.value }.prefix(5)
         Card(title: title) {
             if total < 60 {
-                Text("아직 기록이 없어요. 집중을 시작하면 쌓여요.").foregroundStyle(.secondary)
+                Text(L("아직 기록이 없어요. 집중을 시작하면 쌓여요.", "Nothing yet. Start a focus session to see data here.")).foregroundStyle(.secondary)
             } else {
                 ForEach(Array(top.enumerated()), id: \.element.key) { i, item in
                     let share = item.value / total
@@ -975,13 +1003,13 @@ struct TopCard: View {
                         }
                         .frame(height: 12)
                         Text("\(Int((share * 100).rounded()))%").font(.callout.bold().monospacedDigit()).frame(width: 44, alignment: .trailing)
-                        Text(item.value < 60 ? "1분 미만" : fmtMinutes(item.value))
+                        Text(item.value < 60 ? L("1분 미만", "<1 min") : fmtMinutes(item.value))
                             .font(.callout.monospacedDigit()).foregroundStyle(.secondary).frame(width: 84, alignment: .trailing)
                     }
                 }
                 if items.count > 5 {
                     let rest = items.sorted { $0.value > $1.value }.dropFirst(5).map(\.value).reduce(0, +)
-                    Text("기타 \(items.count - 5)개 · \(Int((rest / total * 100).rounded()))%").font(.caption).foregroundStyle(.secondary)
+                    Text(L("기타 \(items.count - 5)개 · \(Int((rest / total * 100).rounded()))%", "\(items.count - 5) more · \(Int((rest / total * 100).rounded()))%")).font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
@@ -1033,40 +1061,57 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("시간").font(.headline)
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-                NumberRow(label: "집중 (분)", value: $s.focusMin, range: Settings.focusRange)
-                NumberRow(label: "정리 (분)", value: $s.wrapMin, range: Settings.wrapRange)
-                NumberRow(label: "휴식 (분)", value: $s.breakMin, range: Settings.breakRange)
-                NumberRow(label: "연속 사용 경고 (분)", value: $s.warnAfterMin, range: Settings.warnRange)
+            HStack {
+                Text("언어 / Language").font(.headline)
+                Spacer()
+                Picker("", selection: Binding(get: { store.settings.language }, set: { lang in
+                    store.setLanguage(lang) // 바로 적용
+                    s.language = lang
+                    s.stopPhrase = store.settings.stopPhrase
+                })) {
+                    Text("한국어").tag(Lang.ko)
+                    Text("English").tag(Lang.en)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 180)
             }
-            Button("기본값으로 (35 · 3 · 7)") {
+
+            Text(L("시간", "Timer")).font(.headline)
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+                NumberRow(label: L("집중 (분)", "Focus (min)"), value: $s.focusMin, range: Settings.focusRange)
+                NumberRow(label: L("정리 (분)", "Wrap-up (min)"), value: $s.wrapMin, range: Settings.wrapRange)
+                NumberRow(label: L("휴식 (분)", "Break (min)"), value: $s.breakMin, range: Settings.breakRange)
+                NumberRow(label: L("연속 사용 경고 (분)", "Distraction alert after (min)"), value: $s.warnAfterMin, range: Settings.warnRange)
+            }
+            Button(L("기본값으로 (35 · 3 · 7)", "Reset to Defaults (35 · 3 · 7)")) {
                 s.focusMin = 35
                 s.wrapMin = 3
                 s.breakMin = 7
             }
             .buttonStyle(.link)
 
-            Text("포기할 때 입력할 문장").font(.headline)
+            Text(L("포기할 때 입력할 문장", "Phrase to type when giving up")).font(.headline)
             TextField("", text: $s.stopPhrase).textFieldStyle(.roundedBorder)
 
-            Text("차단할 사이트 (한 줄에 하나, 하위 도메인 포함)").font(.headline)
+
+            Text(L("차단할 사이트 (한 줄에 하나, 하위 도메인 포함)", "Blocked sites (one per line, includes subdomains)")).font(.headline)
             TextEditor(text: $sitesText)
                 .font(.body.monospaced())
                 .frame(height: 120)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
 
-            Text("허용할 사이트 (위 목록의 하위 도메인이어도 막지 않음)").font(.headline)
+            Text(L("허용할 사이트 (위 목록의 하위 도메인이어도 막지 않음)", "Allowed sites (never blocked, even under a blocked domain)")).font(.headline)
             TextEditor(text: $allowText)
                 .font(.body.monospaced())
                 .frame(height: 44)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
 
-            Toggle("집중 중 쓴 앱 · 사이트 기록 (학습 통계용, 이 맥에만 저장)", isOn: $s.trackStudyUsage)
-            Toggle("아침 6시 이후 처음 맥을 쓸 때 할 일 창 띄우기", isOn: $s.morningPlan)
+            Toggle(L("집중 중 쓴 앱 · 사이트 기록 (학습 통계용, 이 맥에만 저장)", "Track apps and sites used while focusing (for stats, stored only on this Mac)"), isOn: $s.trackStudyUsage)
+            Toggle(L("아침 6시 이후 처음 맥을 쓸 때 할 일 창 띄우기", "Show to-dos the first time I use my Mac after 6 a.m."), isOn: $s.morningPlan)
 
             HStack {
-                Button("저장") {
+                Button(L("저장", "Save")) {
                     s.sites = sitesText.split(whereSeparator: \.isNewline).map(String.init)
                     s.allowSites = allowText.split(whereSeparator: \.isNewline).map(String.init)
                     rejected = store.updateSettings(s)
@@ -1074,15 +1119,15 @@ struct SettingsView: View {
                     saved = true
                 }
                 .keyboardShortcut(.defaultAction)
-                if saved { Text("저장됨 ✓").foregroundStyle(.secondary) }
+                if saved { Text(L("저장됨 ✓", "Saved ✓")).foregroundStyle(.secondary) }
             }
             if !rejected.isEmpty {
-                Text("사이트로 인식하지 못해 뺐어요: \(rejected.joined(separator: ", "))")
+                Text(L("사이트로 인식하지 못해 뺐어요: ", "Removed entries that aren't valid sites: ") + rejected.joined(separator: ", "))
                     .font(.caption).foregroundStyle(.red)
             }
 
             Divider()
-            Toggle("로그인 시 자동 실행 (꺼져 있으면 사이트 차단도 안 돼요)", isOn: Binding(
+            Toggle(L("로그인 시 자동 실행 (꺼져 있으면 사이트 차단도 안 돼요)", "Launch at login (blocking only works while the app is running)"), isOn: Binding(
                 get: { loginOn },
                 set: { _ in
                     toggleLogin()
@@ -1090,19 +1135,19 @@ struct SettingsView: View {
                 }))
 
             Divider()
-            Text("기록 저장 위치").font(.headline)
+            Text(L("기록 저장 위치", "Data location")).font(.headline)
             Text(store.dataDir.path).font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
-            Text("매일 자동으로 백업해요. 앱을 다시 빌드하거나 업데이트해도 기록은 그대로예요.")
+            Text(L("매일 자동으로 백업해요. 앱을 다시 빌드하거나 업데이트해도 기록은 그대로예요.", "Backed up automatically every day. Rebuilding or updating the app keeps your data."))
                 .font(.caption)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
-                Button("다른 폴더 선택…", action: chooseFolder)
-                Button("Finder에서 보기", action: revealFolder)
+                Button(L("다른 폴더 선택…", "Choose Folder…"), action: chooseFolder)
+                Button(L("Finder에서 보기", "Show in Finder"), action: revealFolder)
             }
 
             Divider()
             HStack {
-                Button("Focus Guard 삭제…", role: .destructive, action: uninstall)
+                Button(L("Focus Guard 삭제…", "Delete Focus Guard…"), role: .destructive, action: uninstall)
                 Spacer()
                 Text("v\(Updater.shared.current) · \(madeBy)").font(.caption).foregroundStyle(.secondary)
             }
