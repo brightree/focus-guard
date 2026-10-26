@@ -902,7 +902,12 @@ struct SettingsView: View {
             }
 
             Divider()
-            Button("Focus Guard 삭제…", role: .destructive, action: uninstall)
+            HStack {
+                Button("Focus Guard 삭제…", role: .destructive, action: uninstall)
+                Spacer()
+                Text("버전 \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .padding(20)
         .frame(width: 480)

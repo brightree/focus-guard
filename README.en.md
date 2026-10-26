@@ -31,6 +31,8 @@ cd focus-guard/app
 open FocusGuard.app
 ```
 
+Or paste the one-line command from the [Korean README](README.md); it installs Xcode Command Line Tools if needed, and running it again updates the app (it quits the running copy and opens the new build). The version is shown at the bottom of Settings; see [CHANGELOG.md](CHANGELOG.md) for changes.
+
 The script creates `app/FocusGuard.app` for your Mac's architecture. You can move it to `/Applications` if you prefer. Once launched, Focus Guard appears as a 🍅 icon in the menu bar. It shows up in the Dock and ⌘Tab only while one of its windows is open.
 
 ### Permissions
@@ -130,6 +132,7 @@ To uninstall by hand:
 
 ```text
 app/
+  VERSION                  App version (shown in Settings)
   build.sh                 Builds the app with swiftc; no Xcode project required
   MakeIcon.swift           Draws the 🍅 app icon at build time
   Sources/

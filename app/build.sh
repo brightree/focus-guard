@@ -5,6 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP=FocusGuard.app
+VERSION=$(tr -d '[:space:]' < VERSION) # 버전은 app/VERSION 한 곳에서 관리 (변경 내역: CHANGELOG.md)
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
@@ -28,8 +29,6 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleExecutable</key><string>FocusGuard</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>2.0</string>
-  <key>CFBundleVersion</key><string>2</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSAppleEventsUsageDescription</key><string>집중 시간에 분산 사이트 탭을 차단 페이지로 바꾸고, 딴짓 시간을 기록하려고 브라우저의 현재 탭 주소를 확인해요.</string>
@@ -37,7 +36,10 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
+plutil -insert CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
+plutil -insert CFBundleVersion -string "$VERSION" "$APP/Contents/Info.plist"
+
 codesign --force --sign - "$APP" >/dev/null
 # 바뀐 아이콘이 바로 보이도록 시스템에 다시 등록
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" || true
-echo "built $(pwd)/$APP"
+echo "built $(pwd)/$APP (v$VERSION)"
