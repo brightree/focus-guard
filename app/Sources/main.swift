@@ -100,6 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
         server.start()
         watcher.onWarn = { [weak self] min, site, bid in self?.showWarning(min: min, site: site, bid: bid) }
         store.onSecond = { [weak self] in self?.watcher.tick() }
+        Updater.shared.start()
         if store.isBlocking { watcher.sweepAllTabs() }
         renderTitle()
     }
@@ -137,6 +138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
             primary: { [weak self] in self?.popover.performClose(nil); self?.primaryAction() },
             togglePause: { [weak self] in self?.togglePause() },
             openApp: { [weak self] in self?.popover.performClose(nil); self?.showDashboard() },
+            openUpdate: { [weak self] in self?.popover.performClose(nil); self?.showUpdate() },
             close: { [weak self] in self?.popover.performClose(nil) }
         ).environmentObject(store))
         host.sizingOptions = .preferredContentSize
@@ -217,6 +219,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
         }
     }
 
+    func showUpdate() {
+        Windows.shared.show("update", title: "업데이트") { UpdateView { Windows.shared.close("update") } }
+    }
+
     func showGiveUp() { presentGiveUp(thenQuit: false) }
 
     func presentGiveUp(thenQuit: Bool) {
@@ -241,7 +247,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
             SettingsView(chooseFolder: { [weak self] in self?.chooseFolder() },
                          revealFolder: { [weak self] in self?.revealFolder() },
                          toggleLogin: { [weak self] in self?.toggleLogin() },
-                         uninstall: { [weak self] in self?.uninstall() })
+                         uninstall: { [weak self] in self?.uninstall() },
+                         openUpdate: { [weak self] in self?.showUpdate() })
         }
     }
 

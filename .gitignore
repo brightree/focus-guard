@@ -8,3 +8,6 @@
 data.json
 data.unreadable-*.json
 backups/
+
+# 로컬 전용 파일
+INTERNAL.md

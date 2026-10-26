@@ -8,7 +8,9 @@ struct PopoverView: View {
     var primary: () -> Void
     var togglePause: () -> Void
     var openApp: () -> Void
+    var openUpdate: () -> Void
     var close: () -> Void
+    @ObservedObject private var updater = Updater.shared
     @State private var text = ""
     @State private var saved = false
     @FocusState private var focused: Bool
@@ -66,6 +68,16 @@ struct PopoverView: View {
                 Text("⚠️ \(err)").font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
             }
 
+            if let v = updater.latest {
+                HStack {
+                    Text("🆕 새 버전 \(v)").font(.callout.bold())
+                    Spacer()
+                    Button("업데이트", action: openUpdate).controlSize(.small)
+                }
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.12)))
+            }
+
             if store.browserAccessDenied {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("⚠️ 브라우저 제어 권한이 꺼져 있어서 사이트 차단이 안 돼요.")
@@ -112,6 +124,45 @@ struct WarnView: View {
         }
         .padding(24)
         .frame(width: 380)
+    }
+}
+
+// MARK: - 업데이트
+
+struct UpdateView: View {
+    @ObservedObject private var updater = Updater.shared
+    var close: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("🍅 새 버전 \(updater.latest ?? "")").font(.title3.bold())
+            Text("지금 버전 \(updater.current)").foregroundStyle(.secondary)
+            ScrollView {
+                Text(updater.notes.isEmpty ? "바뀐 내용을 불러오는 중…" : updater.notes)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            }
+            .frame(height: 180)
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 8).fill(.background.secondary))
+            switch updater.state {
+            case .updating:
+                HStack { ProgressView().controlSize(.small); Text("받아서 빌드하는 중… (1분 정도) 끝나면 자동으로 다시 켜져요") }
+            case .failed(let msg):
+                Text(msg).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+            default:
+                EmptyView()
+            }
+            HStack {
+                Spacer()
+                Button("나중에", action: close).keyboardShortcut(.cancelAction)
+                Button("지금 업데이트") { updater.update() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(updater.state == .updating || updater.latest == nil)
+            }
+        }
+        .padding(20)
+        .frame(width: 460)
     }
 }
 
@@ -833,6 +884,8 @@ struct SettingsView: View {
     var revealFolder: () -> Void
     var toggleLogin: () -> Void
     var uninstall: () -> Void
+    var openUpdate: () -> Void
+    @ObservedObject private var updater = Updater.shared
     @State private var loginOn = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -905,8 +958,18 @@ struct SettingsView: View {
             HStack {
                 Button("Focus Guard 삭제…", role: .destructive, action: uninstall)
                 Spacer()
-                Text("버전 \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("버전 \(updater.current)").font(.caption).foregroundStyle(.secondary)
+                Button("업데이트 확인") {
+                    if updater.latest != nil { openUpdate() } else { updater.check() }
+                }
+                .controlSize(.small)
+            }
+            switch updater.state {
+            case .checking: Text("확인 중…").font(.caption).foregroundStyle(.secondary)
+            case .upToDate: Text("최신 버전이에요 ✓").font(.caption).foregroundStyle(.secondary)
+            case .available(let v): Text("새 버전 \(v)이 있어요 — 업데이트 확인을 눌러 설치").font(.caption).foregroundStyle(.blue)
+            case .failed(let msg): Text(msg).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+            default: EmptyView()
             }
         }
         .padding(20)

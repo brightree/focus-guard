@@ -31,7 +31,17 @@ cd focus-guard/app
 open FocusGuard.app
 ```
 
-Or paste the one-line command from the [Korean README](README.md); it installs Xcode Command Line Tools if needed, and running it again updates the app (it quits the running copy and opens the new build). The version is shown at the bottom of Settings; see [CHANGELOG.md](CHANGELOG.md) for changes.
+Or paste the one-line command from the [Korean README](README.md); it installs Xcode Command Line Tools if needed. The version is shown at the bottom of Settings; see [CHANGELOG.md](CHANGELOG.md) for changes.
+
+### Updating
+
+From 1.2.0, the app checks for a new version once a day. When one is available, it shows a notification and an **Update** button in the menu bar panel; the update window lists the changes from the changelog. Clicking **Update now** runs `git pull` and `build.sh` in the folder the app was built from, then relaunches the new build. If the update fails, the current version keeps running. This only works for copies built from a git clone (as the one-line install command does). Settings also has a **Check for updates** button.
+
+For 1.1.1 or earlier, update once from Terminal:
+
+```bash
+killall FocusGuard; cd ~/focus-guard && git pull && cd app && ./build.sh && open FocusGuard.app
+```
 
 The script creates `app/FocusGuard.app` for your Mac's architecture. You can move it to `/Applications` if you prefer. Once launched, Focus Guard appears as a 🍅 icon in the menu bar. It shows up in the Dock and ⌘Tab only while one of its windows is open.
 
@@ -100,7 +110,7 @@ There is no conflict resolution for multiple Macs sharing one folder. A later sa
 
 ### Network and system changes
 
-Focus Guard has no analytics, tracking, automatic updates, or direct outbound network requests. **If you choose a folder synced by a cloud service (for example, Google Drive or iCloud Drive), that service uploads your records.**
+Focus Guard has no analytics or tracking. Its only outbound request is the daily update check, which downloads `app/VERSION` (and, when a new version exists, `CHANGELOG.md`) from `raw.githubusercontent.com`; nothing about you or your usage is sent. Updates are installed only when you click **Update now**, and they build and run whatever is on the repository's `main` branch. **If you choose a folder synced by a cloud service (for example, Google Drive or iCloud Drive), that service uploads your records.**
 
 The app does not require administrator privileges or change `/etc/hosts`, network settings, or other system files.
 
