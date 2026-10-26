@@ -311,6 +311,14 @@ final class Store: ObservableObject {
         }
     }
 
+    func renameTodo(_ id: UUID, to text: String, on day: String) {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        updateDay(day) { d in
+            if let i = d.todos.firstIndex(where: { $0.id == id }) { d.todos[i].text = t }
+        }
+    }
+
     func deleteTodo(_ id: UUID, on day: String) { updateDay(day) { $0.todos.removeAll { $0.id == id } } }
 
     /// 그 날 이전에 할 일을 적었던 가장 가까운 날의 못 한 일

@@ -420,6 +420,9 @@ struct TodoRow: View {
     let day: String
     let color: Color
     @State private var hover = false
+    @State private var editing = false
+    @State private var draft = ""
+    @FocusState private var fieldFocused: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -433,10 +436,27 @@ struct TodoRow: View {
             }
             .buttonStyle(.plain)
 
-            Text(item.text)
-                .strikethrough(item.done)
-                .foregroundStyle(item.done ? .secondary : .primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if editing {
+                // Enter 저장 · Esc 취소 · 다른 곳을 누르면 저장
+                TextField("", text: $draft)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($fieldFocused)
+                    .onSubmit(commit)
+                    .onExitCommand { editing = false }
+                    .onChange(of: fieldFocused) { _, focused in if !focused && editing { commit() } }
+                    .onAppear { fieldFocused = true }
+            } else {
+                Text(item.text)
+                    .strikethrough(item.done)
+                    .foregroundStyle(item.done ? .secondary : .primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2) {
+                        draft = item.text
+                        editing = true
+                    }
+                    .help(L("더블 클릭해서 고치기", "Double-click to edit"))
+            }
 
             Button {
                 withAnimation { store.deleteTodo(item.id, on: day) }
@@ -450,7 +470,12 @@ struct TodoRow: View {
         .padding(.vertical, 7)
         .contentShape(Rectangle())
         .onHover { hover = $0 }
-        .opacity(item.done ? 0.6 : 1)
+        .opacity(item.done && !editing ? 0.6 : 1)
+    }
+
+    private func commit() {
+        editing = false
+        store.renameTodo(item.id, to: draft, on: day) // 비우면 원래 글 유지
     }
 }
 
@@ -837,13 +862,7 @@ struct DayDetail: View {
                                 .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                         }
                         ForEach(items) { item in
-                            HStack(spacing: 8) {
-                                Image(systemName: item.done ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(item.done ? kind.color : Color.secondary)
-                                Text(item.text).strikethrough(item.done)
-                                    .foregroundStyle(item.done ? .secondary : .primary)
-                            }
-                            .padding(.leading, 4)
+                            TodoRow(item: item, day: key, color: kind.color)
                         }
                     }
                 }
