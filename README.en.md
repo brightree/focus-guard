@@ -35,7 +35,7 @@ Or paste the one-line command from the [Korean README](README.md); it installs X
 
 ### Updating
 
-From 1.2.0, the app checks for a new version once a day. When one is available, it shows a notification and an **Update** button in the menu bar panel; the update window lists the changes from the changelog. Clicking **Update now** runs `git pull` and `build.sh` in the folder the app was built from, then relaunches the new build. If the update fails, the current version keeps running. This only works for copies built from a git clone (as the one-line install command does). Settings also has a **Check for updates** button.
+From 1.2.0, the app checks for a new version once a day. When one is available, it shows a notification and an **Update** button in the menu bar panel; the update window lists the changes from the changelog. Clicking **Update now** runs `git pull` and `build.sh` in the folder the app was built from, then relaunches the new build. If the update fails, the current version keeps running. This only works for copies built from a git clone (as the one-line install command does). The bottom of the main window also has a **Check for updates** button.
 
 For 1.1.1 or earlier, update once from Terminal:
 
@@ -154,6 +154,10 @@ app/
     BlockedPage.swift      Blocked-page HTML, CSS, and JavaScript
     Views.swift            SwiftUI views
 ```
+
+## Credits
+
+Made by Anonymous, KAIST IS
 
 ## License
 

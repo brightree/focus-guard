@@ -627,7 +627,7 @@ struct DashboardView: View {
 
                 Divider()
                 HStack {
-                    Text("Focus Guard 버전 \(updater.current)").foregroundStyle(.secondary)
+                    Text("Focus Guard 버전 \(updater.current) · \(madeBy)").foregroundStyle(.secondary)
                     switch updater.state {
                     case .checking: Text("확인 중…").foregroundStyle(.secondary)
                     case .upToDate: Text("최신 버전이에요 ✓").foregroundStyle(.secondary)
@@ -904,8 +904,6 @@ struct SettingsView: View {
     var revealFolder: () -> Void
     var toggleLogin: () -> Void
     var uninstall: () -> Void
-    var openUpdate: () -> Void
-    @ObservedObject private var updater = Updater.shared
     @State private var loginOn = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -978,18 +976,7 @@ struct SettingsView: View {
             HStack {
                 Button("Focus Guard 삭제…", role: .destructive, action: uninstall)
                 Spacer()
-                Text("버전 \(updater.current)").font(.caption).foregroundStyle(.secondary)
-                Button("업데이트 확인") {
-                    if updater.latest != nil { openUpdate() } else { updater.check() }
-                }
-                .controlSize(.small)
-            }
-            switch updater.state {
-            case .checking: Text("확인 중…").font(.caption).foregroundStyle(.secondary)
-            case .upToDate: Text("최신 버전이에요 ✓").font(.caption).foregroundStyle(.secondary)
-            case .available(let v): Text("새 버전 \(v)이 있어요 — 업데이트 확인을 눌러 설치").font(.caption).foregroundStyle(.blue)
-            case .failed(let msg): Text(msg).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
-            default: EmptyView()
+                Text("버전 \(Updater.shared.current) · \(madeBy)").font(.caption).foregroundStyle(.secondary)
             }
         }
         .padding(20)

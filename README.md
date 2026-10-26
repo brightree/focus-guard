@@ -55,6 +55,10 @@ killall FocusGuard; cd ~/focus-guard && git pull && cd app && ./build.sh && open
 
 자세한 보안·저장 방식·한계: [English README](README.en.md)
 
+## 만든 사람
+
+Made by Anonymous, KAIST IS
+
 ## 라이선스
 
 [MIT](LICENSE)

@@ -248,8 +248,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
             SettingsView(chooseFolder: { [weak self] in self?.chooseFolder() },
                          revealFolder: { [weak self] in self?.revealFolder() },
                          toggleLogin: { [weak self] in self?.toggleLogin() },
-                         uninstall: { [weak self] in self?.uninstall() },
-                         openUpdate: { [weak self] in self?.showUpdate() })
+                         uninstall: { [weak self] in self?.uninstall() })
         }
     }
 

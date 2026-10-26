@@ -168,6 +168,8 @@ let dayKeyFormatter: DateFormatter = {
     return f
 }()
 
+let madeBy = "Made by Anonymous, KAIST IS"
+
 func dayKey(_ d: Date = Date()) -> String { dayKeyFormatter.string(from: d) }
 
 func fmtMinutes(_ sec: Double) -> String {
