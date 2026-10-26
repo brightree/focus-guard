@@ -202,7 +202,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
     func showWarning(min: Int, site: String, bid: String) {
         Windows.shared.show("warn", title: "딴짓 경고", floating: true) {
             WarnView(min: min, site: site,
-                     closeTab: { [weak self] in self?.watcher.closeFrontTab(bid: bid); Windows.shared.close("warn") },
+                     closeTab: { [weak self] in self?.watcher.closeFrontTab(bid: bid, ifStillOn: site); Windows.shared.close("warn") },
                      keep: { Windows.shared.close("warn") })
         }
     }
@@ -267,13 +267,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
         p.canCreateDirectories = true
         p.prompt = "이 폴더에 저장"
         NSApp.activate(ignoringOtherApps: true)
-        if p.runModal() == .OK, let url = p.url { store.changeDataDir(to: url) }
+        if p.runModal() == .OK, let url = p.url, let err = store.changeDataDir(to: url) {
+            alert("저장 위치를 바꾸지 않았어요", err)
+        }
     }
 
     func useGoogleDrive() {
         if let dir = Store.googleDriveDir() {
-            store.changeDataDir(to: dir)
-            alert("Google Drive에 저장할게요", "\(dir.path)\n\n이제 기록이 Google Drive에 자동으로 올라가요.")
+            if let err = store.changeDataDir(to: dir) {
+                alert("저장 위치를 바꾸지 않았어요", err)
+            } else {
+                alert("Google Drive에 저장할게요", "\(dir.path)\n\n이제 기록이 Google Drive에 자동으로 올라가요.")
+            }
         } else {
             alert("Google Drive 폴더를 찾지 못했어요",
                   "Google Drive 데스크톱 앱(google.com/drive/download)을 설치하고 로그인한 뒤 다시 눌러주세요.\n설치돼 있다면 \"다른 폴더 선택…\"으로 내 드라이브 안의 폴더를 직접 골라도 돼요.")

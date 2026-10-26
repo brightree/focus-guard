@@ -51,7 +51,7 @@ struct PopoverView: View {
                     .textFieldStyle(.roundedBorder)
                     .focused($focused)
                     .onSubmit {
-                        guard !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                        guard !text.trimmingCharacters(in: .whitespaces).isEmpty, store.canPersist else { return }
                         store.addLater(text)
                         text = ""
                         saved = true
@@ -60,6 +60,10 @@ struct PopoverView: View {
                 if saved {
                     Text("✓ 적어뒀어요. 다시 집중!").font(.caption).foregroundStyle(.green)
                 }
+            }
+
+            if let err = store.saveError {
+                Text("⚠️ \(err)").font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
             }
 
             if store.browserAccessDenied {
@@ -410,14 +414,20 @@ struct QuickCaptureView: View {
                 .font(.title3)
                 .onSubmit {
                     guard !text.trimmingCharacters(in: .whitespaces).isEmpty else { return close() }
+                    guard store.canPersist else { return }
                     store.addLater(text)
                     text = ""
                     saved = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { close() }
                 }
-            Text(saved ? "✓ 적어뒀어요. 이제 내려놓고 다시 집중!" : "Enter 저장 · Esc 닫기 · 정리 시간에 다시 보여드려요")
-                .font(.caption)
-                .foregroundStyle(saved ? .green : .secondary)
+            if let err = store.saveError {
+                Text("⚠️ 지금은 저장할 수 없어요. \(err)").font(.caption).foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(saved ? "✓ 적어뒀어요. 이제 내려놓고 다시 집중!" : "Enter 저장 · Esc 닫기 · 정리 시간에 다시 보여드려요")
+                    .font(.caption)
+                    .foregroundStyle(saved ? .green : .secondary)
+            }
         }
         .padding(16)
         .frame(width: 460)
@@ -771,6 +781,7 @@ struct SettingsView: View {
     @State private var s = Settings()
     @State private var sitesText = ""
     @State private var saved = false
+    @State private var rejected: [String] = []
     var chooseFolder: () -> Void
     var useGoogleDrive: () -> Void
     var revealFolder: () -> Void
@@ -782,11 +793,11 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("시간").font(.headline)
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-                NumberRow(label: "집중 (분)", value: $s.focusMin, range: 1...180)
-                NumberRow(label: "정리 (분)", value: $s.wrapMin, range: 1...30)
-                NumberRow(label: "휴식 (분)", value: $s.breakMin, range: 1...60)
-                NumberRow(label: "연속 사용 경고 (분)", value: $s.warnAfterMin, range: 1...120)
-                NumberRow(label: "포기 전 대기 (초)", value: $s.stopWaitSec, range: 0...300)
+                NumberRow(label: "집중 (분)", value: $s.focusMin, range: Settings.focusRange)
+                NumberRow(label: "정리 (분)", value: $s.wrapMin, range: Settings.wrapRange)
+                NumberRow(label: "휴식 (분)", value: $s.breakMin, range: Settings.breakRange)
+                NumberRow(label: "연속 사용 경고 (분)", value: $s.warnAfterMin, range: Settings.warnRange)
+                NumberRow(label: "포기 전 대기 (초)", value: $s.stopWaitSec, range: Settings.stopWaitRange)
             }
             Button("기본값으로 (35 · 3 · 7)") {
                 s.focusMin = 35
@@ -807,7 +818,7 @@ struct SettingsView: View {
             HStack {
                 Button("저장") {
                     s.sites = sitesText.split(whereSeparator: \.isNewline).map(String.init)
-                    store.updateSettings(s)
+                    rejected = store.updateSettings(s)
                     load()
                     saved = true
                 }
@@ -815,6 +826,10 @@ struct SettingsView: View {
                 .disabled(locked)
                 if saved { Text("저장됨 ✓").foregroundStyle(.secondary) }
                 if locked { Text("집중·정리 중에는 바꿀 수 없어요").foregroundStyle(.red) }
+            }
+            if !rejected.isEmpty {
+                Text("사이트로 인식하지 못해 뺐어요: \(rejected.joined(separator: ", "))")
+                    .font(.caption).foregroundStyle(.red)
             }
 
             Divider()
@@ -858,7 +873,8 @@ struct NumberRow: View {
         GridRow {
             Text(label)
             HStack(spacing: 4) {
-                TextField("", value: $value, format: .number)
+                TextField("", value: Binding(get: { value }, set: { value = min(max($0, range.lowerBound), range.upperBound) }),
+                          format: .number)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 60)
                     .multilineTextAlignment(.trailing)

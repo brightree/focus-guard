@@ -1,108 +1,140 @@
 # 🍅 Focus Guard
 
-집중력이 쉽게 흩어지는 사람을 위한 **macOS 메뉴 막대 뽀모도로 앱**입니다.
-의지력 대신 환경으로 집중을 돕는 것을 목표로 만들었습니다.
+Focus Guard is a macOS menu bar app that helps you stay focused with Pomodoro sessions, website blocking, and a place to capture distractions for later.
 
-- **뽀모도로**: 집중 35분 → 정리 3분 → 휴식 7분 (설정에서 변경 가능)
-- **사이트 차단**: 집중·정리 중에는 YouTube, Instagram, LinkedIn 등 분산 사이트 탭을 차단 페이지로 바꿉니다
-- **딴짓 경고**: 집중 외 시간에 한 사이트를 10분 넘게 연속으로 쓰면 경고합니다
-- **나중에 할 것**: 공부 중 떠오른 생각을 `⌥⇧L`(어느 앱에서든) 또는 메뉴 막대 패널에 바로 적어두고, 정리 시간에 다시 봅니다
-- **오늘 할 일**: 아침에 "오늘 반드시 / 하면 좋은 일 / 기타 업무"를 적고 체크합니다
-- **기록**: 주 단위로 하루씩 공부 시간, 한 일과 정리 메모, 딴짓 시간을 봅니다
-- 중간에 포기하려면 30초 대기 + 문장 타이핑이 필요합니다 (충동적 포기 방지)
+## Features
 
-## 요구 사항
+- **A customizable focus cycle:** 35 minutes of focus, 3 minutes to wrap up, and a 7-minute break by default.
+- **Website blocking:** Redirects distracting sites to a local blocked page during focus and wrap-up, including while the timer is paused. The default list includes YouTube, Instagram, LinkedIn, Facebook, X, Twitter, Reddit, and Netflix. You can paste full URLs into the list; only the domain is kept, and lines that aren't recognized as domains are reported.
+- **Distraction reminders:** Outside focus and wrap-up, warns you after 10 minutes of tracked use on a listed site, then at further 10-minute intervals. Brief interruptions of up to 3 minutes can count toward the same streak.
+- **A “Later” list:** Capture a thought from the menu bar or press `⌥⇧L` from any app. Review your list during wrap-up.
+- **Daily planning:** Organize tasks into must-do, nice-to-do, and other tasks, then check them off as you go.
+- **Weekly history:** Review daily study time, completed sessions, wrap-up notes, and time spent on distracting sites. Sessions that cross midnight are split between the two days.
+- **A deliberate stopping step:** Wait 30 seconds and type a confirmation phrase before abandoning a focus session. Both are configurable.
 
-- macOS 14 (Sonoma) 이상, Apple Silicon 또는 Intel
-- Xcode Command Line Tools (`xcode-select --install`) — 소스에서 직접 빌드합니다
-- 지원 브라우저: Chrome, Safari, Arc, Brave, Edge (Firefox는 지원하지 않음)
+The app interface and notifications are currently in Korean. The descriptions below use English names for its controls.
 
-## 설치
+## Requirements
+
+- macOS 14 Sonoma or later, on Apple Silicon or Intel.
+- Xcode Command Line Tools (`xcode-select --install`) to build from source.
+- A supported browser: Google Chrome, Safari, Arc, Brave, or Microsoft Edge. Firefox is not supported.
+
+## Build and run
 
 ```bash
-git clone <이 저장소 주소>
+git clone https://github.com/brightree/focus-guard.git
 cd focus-guard/app
 ./build.sh
 open FocusGuard.app
 ```
 
-`app/FocusGuard.app` 이 만들어집니다. 원하면 `/Applications` 로 옮겨도 됩니다.
-처음 실행하면 메뉴 막대에 🍅 가 생깁니다. Dock 아이콘은 없습니다.
+The script creates `app/FocusGuard.app` for your Mac's architecture. You can move it to `/Applications` if you prefer. Once launched, Focus Guard appears as a 🍅 icon in the menu bar; it does not appear in the Dock.
 
-### 처음 한 번 허용해야 하는 권한
+### Permissions
 
-| 권한 | 언제 | 왜 |
-|---|---|---|
-| **자동화 (브라우저 제어)** | 브라우저를 처음 맨 앞에 띄울 때 macOS가 물어봄 | 현재 탭 주소를 읽고, 분산 사이트 탭을 차단 페이지로 바꾸기 위해 |
-| 알림 | 첫 실행 | 단계 전환, 딴짓 경고 알림 |
-| 로그인 시 자동 실행 (선택) | 설정에서 직접 켬 | 앱이 꺼져 있으면 차단도 동작하지 않기 때문 |
+| Permission | When it is requested | What it is used for |
+| --- | --- | --- |
+| Automation | When the app first tries to control a supported browser | Read tab URLs, redirect blocked tabs, and close a tab when you choose that action in a reminder. |
+| Notifications | On first launch | Show phase changes, distraction reminders, and storage problems. |
+| Launch at login | When you enable it in Settings | Start Focus Guard when you log in. Blocking only works while the app is running. |
 
-자동화 권한을 거부했다면 **시스템 설정 → 개인정보 보호 및 보안 → 자동화** 에서 Focus Guard 아래 브라우저를 켜면 됩니다.
+If you deny browser automation, the menu bar panel shows a warning with a shortcut to **System Settings → Privacy & Security → Automation → Focus Guard**, where you can enable the relevant browser.
 
-## 사용법
+## Everyday use
 
-- 메뉴 막대 🍅 클릭 → **시작 / 일시정지 / 앱 열기 / 중지**, 그리고 "나중에 할 것" 입력칸
-- `⌥⇧L` → 어느 앱에서든 "나중에 할 것" 빠르게 적기
-- 앱 창 → 주간 기록, 오늘 할 일, 설정 (시간, 차단 사이트, 저장 위치, 자동 실행)
+1. Click the 🍅 menu bar icon to start a session, pause or resume the timer, open the main window, or end the current phase. You can also add an item to your Later list here.
+2. Press `⌥⇧L` to capture a thought without opening the main window.
+3. Use the main window to review your weekly history, plan today's tasks, or open Settings.
+4. In Settings, adjust durations, the blocked-site list, the stopping requirement, the storage folder, and launch at login. Timer and blocking settings cannot be saved during focus or wrap-up. Every numeric setting is kept within a fixed range (for example, focus is 1–180 minutes).
 
----
+## Privacy, safety, and limitations
 
-## ⚠️ 보안 · 안정성 · 기기 영향 — 설치 전에 꼭 읽어주세요
+### Browser access
 
-이 앱은 아래 동작을 합니다. 모두 코드에서 확인할 수 있습니다.
+[BrowserWatcher.swift](app/Sources/BrowserWatcher.swift) checks the active tab of the foreground browser roughly once per second. At the start of a focus session—and when the app launches with focus or wrap-up still active—it also reads the URLs of all tabs in running supported browsers and redirects matching tabs, including those in background windows.
 
-### 1. 브라우저 탭을 읽고 바꿉니다
-- 브라우저가 **맨 앞에 있을 때만** 1초마다 **현재 탭의 주소 하나**를 AppleScript로 읽습니다 ([BrowserWatcher.swift](app/Sources/BrowserWatcher.swift)).
-- 읽은 주소는 **차단 목록에 있는 사이트인지 비교하는 데만** 쓰이고, 기록에는 **도메인 이름(예: `youtube.com`)과 머문 시간만** 저장됩니다. 전체 URL·페이지 내용·방문 기록은 저장하지 않습니다.
-- 자동화 권한은 macOS 구조상 "브라우저 제어" 전체 권한입니다. 이 앱이 실제로 하는 일은 **주소 읽기, 주소 바꾸기, 경고 창에서 "탭 닫기"를 눌렀을 때 탭 닫기** 세 가지뿐입니다.
-- ⚠️ **작성 중이던 내용이 사라질 수 있습니다.** 집중을 시작하는 순간 열려 있는 분산 사이트 탭이 모두 차단 페이지로 바뀝니다. 예를 들어 LinkedIn에서 글을 쓰던 중이었다면 그 내용은 저장되지 않습니다.
+Browsing statistics contain the matched domain and tracked time, not full URLs or page contents. The original URL is encoded in the blocked page's URL fragment so you can return to it later. Fragments are not sent to the local HTTP server, but the full blocked-page URL may remain in browser history or browser sync.
 
-### 2. 내 컴퓨터 안에서만 동작하는 작은 웹 서버를 엽니다
-- 차단 페이지를 보여주기 위해 `127.0.0.1:47321` 에서 HTTP 서버가 열립니다 ([Server.swift](app/Sources/Server.swift)). **외부 네트워크에서는 접근할 수 없습니다.**
-- 다른 웹사이트가 이 서버를 이용하지 못하도록 `Host`·`Origin` 헤더가 정확히 이 서버 주소가 아니면 거부합니다(DNS rebinding · CSRF 방지).
-- 같은 맥의 다른 프로그램은 이 서버에서 현재 단계·남은 시간·할 일 제목을 읽고, "나중에 할 것"을 추가할 수 있습니다. 그 외의 기능은 없습니다.
-- 47321 포트를 다른 프로그램이 이미 쓰고 있으면 서버가 열리지 않습니다. 이때도 탭 차단은 되지만 차단 페이지 대신 "연결할 수 없음" 화면이 보입니다.
+macOS grants broad browser automation permission. This app uses it to read tab URLs, replace them with the blocked page, and close a tab when you choose “Close this tab” in a reminder.
 
-### 3. 기록은 암호화되지 않은 파일로 저장됩니다
-- 위치: `~/Library/Application Support/FocusGuard/data.json` (설정에서 Google Drive 등 다른 폴더로 변경 가능)
-- 내용: 할 일, 나중에 할 것, 뽀모도로 기록과 정리 메모, 사이트별 딴짓 시간
-- **평문 JSON** 입니다. 같은 맥 사용자나 동기화 폴더에 접근할 수 있는 사람은 읽을 수 있습니다. 민감한 내용은 적지 마세요.
-- 하루 한 번 `backups/` 에 백업을 남기고 최근 14개만 유지합니다.
-- 기록 파일이 있는데 읽지 못하면(예: 클라우드 파일이 아직 내려받아지지 않음) 원본을 덮어쓰지 않도록 **저장을 멈추고 알림**을 띄웁니다.
-- 두 대의 맥이 같은 Google Drive 폴더를 **동시에** 쓰면 나중에 저장한 쪽이 이깁니다 (병합하지 않음).
+**Redirecting a tab can discard unsaved work.** Save drafts before starting a focus session. The reminder's close action first re-checks the browser's current tab and closes it only if it is still on the site the reminder was about; if you've switched to another site, it does nothing.
 
-### 4. 외부로 보내는 데이터는 없습니다
-- 인터넷으로 아무것도 보내지 않습니다. 분석·추적·자동 업데이트 기능이 없습니다.
-- 관리자 권한을 요구하지 않고, 시스템 파일(`/etc/hosts` 등)이나 네트워크 설정을 바꾸지 않습니다.
+### Local web server
 
-### 5. 기기 리소스와 안정성
-- 측정값 (Apple Silicon, macOS 26): **CPU 평균 약 0.5%, 메모리 약 22MB**. 1초 타이머 하나만 쓰고, 브라우저가 맨 앞이 아니면 AppleScript를 실행하지 않습니다.
-- 브라우저가 응답하지 않으면 AppleScript가 최대 2초 기다리기 때문에, 그동안 앱 화면이 잠깐 멈출 수 있습니다.
-- 앱이 꺼져 있으면 차단도 꺼집니다. 이 앱은 **스스로 돕는 도구이지 강제 차단기가 아닙니다.** 앱을 강제 종료하거나 지원하지 않는 브라우저(Firefox)를 쓰면 우회할 수 있습니다.
-- 서명되지 않은(ad-hoc) 빌드라서, 다시 빌드하면 macOS가 자동화 권한을 **다시 물어볼 수 있습니다**. 빌드 파일(`.app`)을 다른 사람에게 그대로 보내면 Gatekeeper가 실행을 막을 수 있으니, 각자 소스에서 빌드하는 것을 권장합니다.
+[Server.swift](app/Sources/Server.swift) serves the blocked page at `http://127.0.0.1:47321`. It binds to the IPv4 loopback address, so it is not directly accessible from other devices on your network.
 
-## 삭제
+The server requires the exact `Host` header `127.0.0.1:47321`. When an `Origin` header is present, it must match `http://127.0.0.1:47321`. These checks help restrict requests from other websites; they do not authenticate local applications. Malformed requests (missing, invalid, or duplicate `Content-Length`) are rejected, request bodies are limited to 64 KB, and connections are closed after 5 seconds.
 
-1. 메뉴 막대 🍅 → 앱 열기 → **종료** (설정에서 "로그인 시 자동 실행"을 켰다면 먼저 끄기)
-2. `FocusGuard.app` 삭제
-3. 기록까지 지우려면: `~/Library/Application Support/FocusGuard/` 폴더 삭제
-4. 권한 정리(선택): 시스템 설정 → 개인정보 보호 및 보안 → 자동화 에서 Focus Guard 항목 끄기
+Other programs running on your Mac can read the current phase, remaining time, and session task title, or add items to the Later list through this server.
 
-## 구조
+If the server cannot start—for example, because another process is using the port—the app still redirects tabs to that address. The blocked page may fail to load; if another service is listening there, its response may appear instead. When the blocked page can't reach the app, it says so rather than claiming the session has ended.
 
+### Storage and backups
+
+On first launch, Focus Guard looks for a Google Drive for desktop folder under `~/Library/CloudStorage`. If it finds a supported `My Drive` folder, it uses a `FocusGuard` subfolder there automatically. Otherwise, it uses:
+
+```text
+~/Library/Application Support/FocusGuard/data.json
 ```
+
+You can check the active location or choose another folder in Settings. If the selected folder already contains `data.json`, the app loads that file instead of merging it with the current records. The folder only changes if the current records were saved first and the new location can be read (or written, if it's empty); otherwise the app keeps the old location and tells you why.
+
+The file contains tasks, Later items, timer state, session history, wrap-up notes, and distraction statistics. It is **unencrypted JSON**. Anyone with access to the file or its synced folder can read it.
+
+The app creates a dated backup on the first successful save each day and keeps the 14 most recent backups in a `backups/` subfolder. These are local copies beside the data file, not independent backups.
+
+How the app protects an existing file:
+
+- **The file exists but can't be read** (for example, a cloud file that hasn't downloaded): the app stops saving so it can't overwrite it, and shows a warning.
+- **The file can be read but is damaged:** the app copies it to `data.unreadable-<timestamp>-<id>.json`, checks that the copy matches the original byte for byte, and only then starts with empty records. If the copy can't be made, it stops saving instead.
+- **A save fails** (for example, the folder is read-only or disconnected): the menu bar panel shows the error, and the app retries every 30 seconds.
+
+While saving is stopped or failing, the Later inputs refuse new items instead of pretending to save them.
+
+There is no conflict resolution for multiple Macs sharing one folder. A later save can overwrite another Mac's changes.
+
+### Network and system changes
+
+Focus Guard has no analytics, tracking, automatic updates, or direct outbound network requests. **Files stored in Google Drive or another synced folder may be uploaded by that service**, including when Google Drive is selected automatically on first launch.
+
+The app does not require administrator privileges or change `/etc/hosts`, network settings, or other system files.
+
+### Performance and blocking limits
+
+The app uses a single one-second timer for session updates and browser monitoring. Regular polling runs AppleScript only when a supported browser is in the foreground. The all-tab sweep runs at most two scripts per running browser: one to list tabs and one to redirect every matching tab at once. Closed windows and the menu bar panel are released from memory, so they don't keep redrawing in the background.
+
+Time on distracting sites is collected in memory and written to the data file at most every 30 seconds (and on quit). If the app crashes, up to 30 seconds of distraction time can be lost; other changes are saved within about a second.
+
+Browser scripts run synchronously on the main thread with a two-second timeout per script. An unresponsive browser can briefly freeze the interface.
+
+Focus Guard is a self-management aid. Quitting or force-quitting the app, denying automation permission, or using an unsupported browser bypasses blocking.
+
+Builds are ad-hoc signed, without a Developer ID signature or notarization. macOS may ask for automation permission again after a rebuild, and Gatekeeper may prevent a copied build from opening on another Mac. Building from source on each Mac avoids distributing a prebuilt app.
+
+## Uninstall
+
+1. Disable launch at login in Settings if you enabled it.
+2. Open the main window from the menu bar and choose Quit.
+3. Delete `FocusGuard.app`.
+4. To remove your records, delete the active storage folder shown in Settings, including its `backups/` subfolder and any `data.unreadable-*.json` copies. If you changed locations, check previous folders for retained copies as well. Deleting files in a synced folder may also remove them from other devices.
+5. Optionally disable Focus Guard's browser permissions under **System Settings → Privacy & Security → Automation**.
+
+## Project structure
+
+```text
 app/
-  build.sh                 빌드 스크립트 (swiftc, Xcode 프로젝트 없음)
+  build.sh                 Builds the app with swiftc; no Xcode project required
   Sources/
-    main.swift             메뉴 막대, 패널, 창 관리, 전역 단축키
-    Store.swift            타이머·기록·저장 (data.json)
-    Models.swift           데이터 구조
-    BrowserWatcher.swift   브라우저 탭 감시와 차단 (AppleScript)
-    Server.swift           차단 페이지용 로컬 서버 (127.0.0.1)
-    BlockedPage.swift      차단 페이지 HTML
-    Views.swift            SwiftUI 화면들
+    main.swift             Menu bar, windows, global shortcut, and app startup
+    Store.swift            Timer, statistics, and JSON persistence
+    Models.swift           Data models and setting ranges
+    BrowserWatcher.swift   Browser monitoring and redirects through AppleScript
+    Server.swift           Loopback HTTP server for the blocked page
+    BlockedPage.swift      Blocked-page HTML, CSS, and JavaScript
+    Views.swift            SwiftUI views
 ```
 
-## 라이선스
+## License
 
 [MIT](LICENSE)

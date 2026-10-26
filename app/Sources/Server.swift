@@ -7,6 +7,7 @@ import Network
 //   POST /later {text}    → 나중에 할 것 추가
 
 let SERVER_PORT: UInt16 = 47321
+private let maxBodyBytes = 64 * 1024
 
 final class StateServer {
     private var listener: NWListener?
@@ -22,8 +23,13 @@ final class StateServer {
             NSLog("FocusGuard: listen failed: \(error)")
             return
         }
+        listener?.stateUpdateHandler = { state in
+            if case .failed(let error) = state { NSLog("FocusGuard: server failed: \(error)") }
+        }
         listener?.newConnectionHandler = { [weak self] conn in
             conn.start(queue: .main)
+            // 요청을 끝내지 않고 붙잡고 있는 연결은 5초 뒤 끊는다
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { conn.cancel() }
             self?.receive(conn, buffer: Data())
         }
         listener?.start(queue: .main)
@@ -34,9 +40,19 @@ final class StateServer {
             guard let self else { return }
             var buf = buffer
             if let data { buf.append(data) }
-            if let (headers, body) = Self.split(buf), body.count >= Self.contentLength(headers) {
-                self.handle(conn, headers: headers, body: body)
-            } else if isComplete || error != nil || buf.count > 1_000_000 {
+            if let (headers, body) = Self.split(buf) {
+                let lines = headers.split(separator: "\r\n", omittingEmptySubsequences: false)
+                guard let length = Self.contentLength(lines) else {
+                    return self.send(conn, status: "400 Bad Request", type: "text/plain", body: Data())
+                }
+                guard length <= maxBodyBytes else {
+                    return self.send(conn, status: "413 Payload Too Large", type: "text/plain", body: Data())
+                }
+                if body.count >= length {
+                    return self.handle(conn, lines: lines, body: body.prefix(length))
+                }
+            }
+            if isComplete || error != nil || buf.count > maxBodyBytes + 16 * 1024 {
                 conn.cancel()
             } else {
                 self.receive(conn, buffer: buf)
@@ -49,23 +65,25 @@ final class StateServer {
         return (String(decoding: data[..<range.lowerBound], as: UTF8.self), Data(data[range.upperBound...]))
     }
 
-    private static func header(_ name: String, in lines: [Substring]) -> String? {
-        for line in lines.dropFirst() {
-            let parts = line.split(separator: ":", maxSplits: 1)
-            if parts.count == 2, parts[0].lowercased() == name { return parts[1].trimmingCharacters(in: .whitespaces) }
+    /// 헤더 값들 (이름은 대소문자 무시). 값이 비어 있어도 안전하게 "" 를 돌려준다.
+    private static func headers(_ name: String, in lines: [Substring]) -> [String] {
+        lines.dropFirst().compactMap { line in
+            guard let colon = line.firstIndex(of: ":"), line[..<colon].lowercased() == name else { return nil }
+            return line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
         }
-        return nil
     }
 
-    private static func contentLength(_ headers: String) -> Int {
-        for line in headers.split(separator: "\r\n") where line.lowercased().hasPrefix("content-length:") {
-            return Int(line.split(separator: ":", maxSplits: 1)[1].trimmingCharacters(in: .whitespaces)) ?? 0
-        }
-        return 0
+    private static func header(_ name: String, in lines: [Substring]) -> String? { headers(name, in: lines).first }
+
+    /// 본문 길이. 없으면 0, 비었거나·숫자가 아니거나·음수거나·여러 개면 nil (잘못된 요청).
+    private static func contentLength(_ lines: [Substring]) -> Int? {
+        let values = headers("content-length", in: lines)
+        if values.isEmpty { return 0 }
+        guard values.count == 1, let n = Int(values[0]), n >= 0 else { return nil }
+        return n
     }
 
-    private func handle(_ conn: NWConnection, headers: String, body: Data) {
-        let lines = headers.split(separator: "\r\n")
+    private func handle(_ conn: NWConnection, lines: [Substring], body: Data) {
         let requestLine = String(lines.first ?? "")
         // 다른 웹사이트가 이 서버를 부르지 못하게 한다:
         // Host 가 정확히 우리 주소가 아니면 거부(DNS rebinding 방지), Origin 이 있으면 우리 주소만 허용(CSRF 방지).
@@ -85,8 +103,17 @@ final class StateServer {
         } else if requestLine.hasPrefix("GET /status") {
             out = statusJSON()
         } else if requestLine.hasPrefix("POST /later") {
-            store.addLater(json["text"] as? String ?? "")
-            out = statusJSON()
+            let text = (json["text"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if text.isEmpty {
+                status = "400 Bad Request"
+            } else if !store.canPersist {
+                // 저장이 막혀 있으면 받았다고 하지 않는다
+                status = "503 Service Unavailable"
+                out = ["error": store.saveError ?? "기록을 저장할 수 없는 상태예요."]
+            } else {
+                store.addLater(text)
+                out = statusJSON()
+            }
         } else {
             status = "404 Not Found"
         }

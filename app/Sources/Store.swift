@@ -11,6 +11,8 @@ final class Store: ObservableObject {
     @Published private(set) var dataDir: URL
     /// 브라우저 제어(자동화) 권한이 거부됐는지 — 패널에서 안내한다
     @Published var browserAccessDenied = false
+    /// 저장에 실패했거나 막혀 있으면 그 이유 — 패널에서 안내한다
+    @Published private(set) var saveError: String?
 
     /// 단계가 바뀔 때 UI가 창을 띄우도록 알려준다 (이전 단계, 새 단계)
     var onPhaseChange: ((Phase, Phase) -> Void)?
@@ -22,6 +24,10 @@ final class Store: ObservableObject {
     private var saveBlocked = false
     /// 1초 타이머마다 불린다 (브라우저 감시 등)
     var onSecond: (() -> Void)?
+    /// 딴짓 시간은 매초 파일에 쓰지 않고 여기 모았다가 30초마다 반영한다 (날짜 → 사이트 → 초)
+    private var pendingDistract: [String: [String: Double]] = [:]
+    private var lastDistractFlush = Date()
+    private var lastBackupKey = ""
 
     private static let dirKey = "dataDir"
     private static let streakGapSec: Double = 180
@@ -54,17 +60,25 @@ final class Store: ObservableObject {
     }
 
     /// 진행 중인 구간까지 포함한 오늘 공부 시간
-    var liveStudySec: Double { today.focusSec + pendingStudySec() }
+    var liveStudySec: Double { studySec(for: dayKey(now)) }
 
     func studySec(for key: String) -> Double {
-        let base = data.days[key]?.focusSec ?? 0
-        return key == dayKey(now) ? base + pendingStudySec() : base
+        (data.days[key]?.focusSec ?? 0) + (pendingStudyByDay()[key] ?? 0)
     }
 
-    private func pendingStudySec() -> Double {
-        guard phase.isStudy, let start = data.timer.startedAt else { return 0 }
+    /// 아직 기록에 반영되지 않은 진행 중 공부 시간을 날짜별로 나눈다 (자정을 넘으면 두 날로)
+    private func pendingStudyByDay() -> [String: Double] {
+        guard phase.isStudy, let start = data.timer.startedAt else { return [:] }
         let until = min(now, data.timer.endTime ?? now)
-        return max(0, until.timeIntervalSince(start))
+        var out: [String: Double] = [:]
+        var s = start
+        while s < until {
+            let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: s))!
+            let e = min(until, nextDay)
+            out[dayKey(s), default: 0] += e.timeIntervalSince(s)
+            s = e
+        }
+        return out
     }
 
     // MARK: - 변경 헬퍼
@@ -74,18 +88,18 @@ final class Store: ObservableObject {
         scheduleSave()
     }
 
-    private func updateToday(_ f: (inout DayStats) -> Void) {
+    private func updateDay(_ k: String, _ f: (inout DayStats) -> Void) {
         mutate { d in
-            let k = dayKey()
             var day = d.days[k] ?? DayStats()
             f(&day)
             d.days[k] = day
         }
     }
 
+    private func updateToday(_ f: (inout DayStats) -> Void) { updateDay(dayKey(), f) }
+
     private func flushStudyTime() {
-        let sec = pendingStudySec()
-        if sec > 0 { updateToday { $0.focusSec += sec } }
+        for (k, sec) in pendingStudyByDay() where sec > 0 { updateDay(k) { $0.focusSec += sec } }
         mutate { $0.timer.startedAt = nil }
     }
 
@@ -113,10 +127,15 @@ final class Store: ObservableObject {
         flushStudyTime()
         switch phase {
         case .focus:
-            let t = timer.task, m = settings.focusMin
-            updateToday { d in
+            let entry = LogEntry(task: timer.task, minutes: settings.focusMin, end: Date(), done: true)
+            let k = dayKey()
+            updateDay(k) { d in
                 d.sessions += 1
-                d.log.append(LogEntry(task: t, minutes: m, end: Date(), done: true))
+                d.log.append(entry)
+            }
+            mutate { d in
+                d.timer.lastLogDay = k
+                d.timer.lastLogID = entry.id
             }
             enter(.wrap, minutes: settings.wrapMin)
             notify("🍅 집중 완료! 정리 \(settings.wrapMin)분", "어디까지 했는지, 다음에 뭘 할지 적고 나중에 할 것을 훑어보세요.")
@@ -141,14 +160,20 @@ final class Store: ObservableObject {
         if phase == .wrap { phaseEnded() }
     }
 
+    /// 방금 끝난 집중 세션에 정리 메모를 붙인다
     func saveNote(_ note: String) {
-        updateToday { d in
-            guard !d.log.isEmpty else { return }
-            d.log[d.log.count - 1].note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let k = timer.lastLogDay, let id = timer.lastLogID else { return }
+        updateDay(k) { d in
+            if let i = d.log.firstIndex(where: { $0.id == id }) {
+                d.log[i].note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
         }
     }
 
-    var lastNote: String { today.log.last?.note ?? "" }
+    var lastNote: String {
+        guard let k = timer.lastLogDay, let id = timer.lastLogID else { return "" }
+        return data.days[k]?.log.first { $0.id == id }?.note ?? ""
+    }
 
     func pause() {
         guard phase != .idle, !isPaused else { return }
@@ -195,33 +220,49 @@ final class Store: ObservableObject {
         if let end = data.timer.endTime, data.timer.pausedRemaining == nil, now >= end {
             phaseEnded()
         }
+        if !pendingDistract.isEmpty, now.timeIntervalSince(lastDistractFlush) >= 30 {
+            flushDistract()
+            scheduleSave()
+        }
         onSecond?()
     }
 
     // MARK: - 설정
 
-    func updateSettings(_ s: Settings) {
-        var s = s
-        s.focusMin = max(1, s.focusMin)
-        s.wrapMin = max(1, s.wrapMin)
-        s.breakMin = max(1, s.breakMin)
-        s.sites = Array(NSOrderedSet(array: s.sites.compactMap(Self.normalizeSite))) as? [String] ?? []
+    /// 설정을 저장하고, 사이트로 인식하지 못한 줄을 돌려준다
+    @discardableResult
+    func updateSettings(_ s: Settings) -> [String] {
+        var s = s.clamped()
+        var sites: [String] = []
+        var rejected: [String] = []
+        for raw in s.sites where !raw.trimmingCharacters(in: .whitespaces).isEmpty {
+            if let site = Self.normalizeSite(raw) {
+                if !sites.contains(site) { sites.append(site) }
+            } else {
+                rejected.append(raw)
+            }
+        }
+        s.sites = sites
         if s.stopPhrase.trimmingCharacters(in: .whitespaces).isEmpty { s.stopPhrase = Settings().stopPhrase }
         mutate { $0.settings = s }
+        return rejected
     }
 
+    /// "https://www.youtube.com/watch?v=1", "youtube.com:443" 등에서 도메인만 뽑는다. 도메인이 아니면 nil.
     static func normalizeSite(_ raw: String) -> String? {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        for p in ["https://", "http://", "www."] where s.hasPrefix(p) { s.removeFirst(p.count) }
-        if let slash = s.firstIndex(of: "/") { s = String(s[..<slash]) }
-        return s.isEmpty ? nil : s
+        if !s.contains("://") { s = "https://" + s }
+        guard var host = URLComponents(string: s)?.host, host.contains("."),
+              host.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" || $0 == "." }) else { return nil }
+        if host.hasPrefix("www.") { host.removeFirst(4) }
+        return host
     }
 
     // MARK: - 나중에 할 것
 
     func addLater(_ text: String) {
-        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return }
+        let t = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(500))
+        guard !t.isEmpty, canPersist else { return } // 저장할 수 없으면 받지 않는다 (사라질 항목을 받은 척하지 않게)
         let during = phase.isStudy ? timer.task : ""
         mutate { $0.later.append(LaterItem(text: t, created: Date(), during: during)) }
     }
@@ -281,7 +322,7 @@ final class Store: ObservableObject {
         if let s = streak, t.timeIntervalSince(s.lastSeen) > Self.streakGapSec { streak = nil }
         guard active, let site, delta > 0 else { return nil }
 
-        updateToday { $0.distractSec[site, default: 0] += delta }
+        pendingDistract[dayKey(t), default: [:]][site, default: 0] += delta
         if streak?.site != site { streak = (site, 0, t, 0) }
         streak!.sec += delta
         streak!.lastSeen = t
@@ -295,6 +336,21 @@ final class Store: ObservableObject {
         notify("⏰ 딴짓 경고", "\(site)를 \(streak!.warnedMin)분째 쓰고 있어요.")
         return (streak!.warnedMin, site)
     }
+
+    /// 모아둔 딴짓 시간을 기록에 반영한다 (저장 예약은 하지 않음)
+    private func flushDistract() {
+        lastDistractFlush = Date()
+        guard !pendingDistract.isEmpty else { return }
+        for (k, sites) in pendingDistract {
+            var day = data.days[k] ?? DayStats()
+            for (site, sec) in sites { day.distractSec[site, default: 0] += sec }
+            data.days[k] = day
+        }
+        pendingDistract = [:]
+    }
+
+    /// 저장이 막혀 있거나 실패 중이면 false — "저장됐다"고 말하면 안 될 때
+    var canPersist: Bool { !saveBlocked && saveError == nil }
 
     // MARK: - 알림
 
@@ -346,22 +402,36 @@ final class Store: ObservableObject {
         saveBlocked = false
         guard FileManager.default.fileExists(atPath: dataURL.path) else {
             data = DataFile()
+            saveError = nil
             return
         }
         guard let raw = try? Data(contentsOf: dataURL) else {
-            saveBlocked = true
-            data = DataFile()
-            notify("기록 파일을 읽지 못했어요", "\(dataURL.path)\n원본을 지키기 위해 저장을 멈췄어요. 파일을 확인한 뒤 앱을 다시 켜주세요.")
+            blockSaving("기록 파일을 읽지 못해서 원본을 지키려고 저장을 멈췄어요. 파일을 확인한 뒤 앱을 다시 켜주세요.")
             return
         }
         do {
             data = try Self.decoder.decode(DataFile.self, from: raw)
+            saveError = nil
         } catch {
-            // 읽을 수 없는 파일은 지우지 않고 옆에 보관한 뒤 새로 시작한다.
-            let bad = dataDir.appendingPathComponent("data.unreadable-\(Int(Date().timeIntervalSince1970)).json")
-            try? FileManager.default.moveItem(at: dataURL, to: bad)
-            data = DataFile()
+            // 해석할 수 없는 파일은 겹치지 않는 이름으로 복사해 두고, 복사본이 원본과 같을 때만 새로 시작한다.
+            let copy = dataDir.appendingPathComponent("data.unreadable-\(Int(Date().timeIntervalSince1970))-\(UUID().uuidString.prefix(8)).json")
+            do {
+                try FileManager.default.copyItem(at: dataURL, to: copy)
+                guard try Data(contentsOf: copy) == raw else { throw CocoaError(.fileWriteUnknown) }
+                data = DataFile()
+                saveError = nil
+                notify("기록 파일이 손상돼 새로 시작해요", "원래 파일은 \(copy.lastPathComponent) 로 보관했어요.")
+            } catch {
+                blockSaving("기록 파일이 손상됐는데 보관 복사본을 만들지 못해서 저장을 멈췄어요. 원본: \(dataURL.path)")
+            }
         }
+    }
+
+    private func blockSaving(_ reason: String) {
+        saveBlocked = true
+        saveError = reason
+        data = DataFile()
+        notify("기록을 저장하지 않고 있어요", reason)
     }
 
     /// 변경이 계속 들어와도 최대 1초 안에 한 번은 저장된다.
@@ -372,22 +442,40 @@ final class Store: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
     }
 
-    func saveNow() {
+    @discardableResult
+    func saveNow() -> Bool {
         saveWork?.cancel()
         saveWork = nil
-        guard !saveBlocked else { return }
+        flushDistract()
+        guard !saveBlocked else { return false }
         let fm = FileManager.default
         do {
             try fm.createDirectory(at: dataDir, withIntermediateDirectories: true)
             try Self.encoder.encode(data).write(to: dataURL, options: .atomic)
-            try backupIfNeeded()
         } catch {
             NSLog("FocusGuard: save failed: \(error)")
+            saveError = "기록을 저장하지 못했어요: \(error.localizedDescription)"
+            scheduleRetry()
+            return false
         }
+        saveError = nil
+        try? backupIfNeeded()
+        return true
+    }
+
+    /// 저장에 실패하면 30초 뒤 다시 시도한다
+    private func scheduleRetry() {
+        guard saveWork == nil else { return }
+        let work = DispatchWorkItem { [weak self] in self?.saveNow() }
+        saveWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: work)
     }
 
     /// 하루 한 번 backups/data-YYYY-MM-DD.json 을 남기고 최근 14개만 유지한다.
     private func backupIfNeeded() throws {
+        let key = dataDir.path + "|" + dayKey()
+        guard key != lastBackupKey else { return }
+        lastBackupKey = key
         let fm = FileManager.default
         let dir = dataDir.appendingPathComponent("backups", isDirectory: true)
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -400,14 +488,30 @@ final class Store: ObservableObject {
     }
 
     /// 저장 폴더를 바꾼다. 새 폴더에 이미 data.json 이 있으면 그걸 불러오고, 없으면 지금 기록을 옮겨 쓴다.
-    func changeDataDir(to dir: URL) {
-        saveNow()
+    /// 실패하면 폴더를 바꾸지 않고 이유를 돌려준다.
+    func changeDataDir(to dir: URL) -> String? {
+        if !saveBlocked, !saveNow() {
+            return "지금 기록을 저장하지 못해서 폴더를 바꾸지 않았어요. \(saveError ?? "")"
+        }
+        let old = dataDir, oldBlocked = saveBlocked, oldError = saveError
         dataDir = dir
-        UserDefaults.standard.set(dir.path, forKey: Self.dirKey)
         if FileManager.default.fileExists(atPath: dataURL.path) {
             load()
+            if saveBlocked {
+                dataDir = old
+                load()
+                return "그 폴더의 기록 파일을 읽지 못해서 폴더를 바꾸지 않았어요."
+            }
         } else {
-            saveNow()
+            saveBlocked = false
+            if !saveNow() {
+                dataDir = old
+                saveBlocked = oldBlocked
+                saveError = oldError
+                return "새 폴더에 저장하지 못해서 폴더를 바꾸지 않았어요."
+            }
         }
+        UserDefaults.standard.set(dir.path, forKey: Self.dirKey)
+        return nil
     }
 }

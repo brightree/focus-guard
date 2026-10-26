@@ -45,6 +45,25 @@ struct Settings: Codable, Equatable {
         stopWaitSec = try c.decodeIfPresent(Int.self, forKey: .stopWaitSec) ?? d.stopWaitSec
         stopPhrase = try c.decodeIfPresent(String.self, forKey: .stopPhrase) ?? d.stopPhrase
         sites = try c.decodeIfPresent([String].self, forKey: .sites) ?? d.sites
+        self = clamped()
+    }
+
+    static let focusRange = 1...180
+    static let wrapRange = 1...30
+    static let breakRange = 1...60
+    static let warnRange = 1...120
+    static let stopWaitRange = 0...300
+
+    /// 모든 숫자 설정을 허용 범위 안으로 맞춘다 (화면 입력, 저장, 파일 읽기 모두 여기를 거친다)
+    func clamped() -> Settings {
+        func clamp(_ v: Int, _ r: ClosedRange<Int>) -> Int { min(max(v, r.lowerBound), r.upperBound) }
+        var s = self
+        s.focusMin = clamp(focusMin, Self.focusRange)
+        s.wrapMin = clamp(wrapMin, Self.wrapRange)
+        s.breakMin = clamp(breakMin, Self.breakRange)
+        s.warnAfterMin = clamp(warnAfterMin, Self.warnRange)
+        s.stopWaitSec = clamp(stopWaitSec, Self.stopWaitRange)
+        return s
     }
 }
 
@@ -54,10 +73,14 @@ struct TimerState: Codable {
     var pausedRemaining: TimeInterval? // 초
     var startedAt: Date? // 현재 공부 구간 시작 (공부 시간 누적용)
     var task = ""
+    var lastLogDay: String? // 마지막으로 끝난 집중 세션이 기록된 날 (정리 메모를 붙일 곳)
+    var lastLogID: UUID?
 
     init() {}
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        lastLogDay = try c.decodeIfPresent(String.self, forKey: .lastLogDay)
+        lastLogID = try c.decodeIfPresent(UUID.self, forKey: .lastLogID)
         phase = try c.decodeIfPresent(Phase.self, forKey: .phase) ?? .idle
         endTime = try c.decodeIfPresent(Date.self, forKey: .endTime)
         pausedRemaining = try c.decodeIfPresent(TimeInterval.self, forKey: .pausedRemaining)

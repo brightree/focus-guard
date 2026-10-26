@@ -21,6 +21,7 @@ let blockedPageHTML = #"""
   label { display:block; text-align:left; font-size:13px; font-weight:600; color:var(--muted); margin:18px 0 6px; }
   input { font:inherit; width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--text); }
   .hint { text-align:left; font-size:13px; min-height:20px; margin-top:4px; color:var(--break); }
+  .hint.err { color:var(--focus); }
   a.btn { display:inline-block; margin-top:12px; padding:10px 16px; border-radius:10px; background:var(--break); color:#fff; text-decoration:none; font-weight:600; }
   .url { word-break:break-all; font-size:12px; margin-top:18px; }
   .hidden { display:none; }
@@ -39,6 +40,10 @@ let blockedPageHTML = #"""
     <div id="hint" class="hint"></div>
     <p class="muted" style="margin-top:16px">⌘W로 이 탭을 닫고 공부로 돌아가요.</p>
   </div>
+  <div id="offlineView" class="hidden">
+    <h1>앱과 연결할 수 없어요</h1>
+    <p class="muted">Focus Guard가 켜져 있는지 확인해 주세요. 연결되면 자동으로 다시 보여드려요.</p>
+  </div>
   <div id="doneView" class="hidden">
     <h1>집중 시간이 끝났어요</h1>
     <p class="muted">이제 원래 페이지로 갈 수 있어요.</p>
@@ -54,21 +59,31 @@ let blockedPageHTML = #"""
   $('url').textContent = original ? '차단된 주소: ' + original : '';
   $('go').href = original || 'about:blank';
 
-  let st = null, fetchedAt = 0;
+  // view: 'loading' | 'offline' | 'blocking' | 'done' — 응답을 받기 전엔 끝났다고 보여주지 않는다
+  let st = null, view = 'loading', fetchedAt = 0;
   const clock = (s) => { s = Math.max(0, s); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
 
   function render() {
-    const blocking = st && st.block;
-    $('focusView').classList.toggle('hidden', !blocking);
-    $('doneView').classList.toggle('hidden', !!blocking);
-    if (!blocking) return;
+    $('focusView').classList.toggle('hidden', view !== 'blocking');
+    $('offlineView').classList.toggle('hidden', view !== 'offline');
+    $('doneView').classList.toggle('hidden', view !== 'done');
+    if (view !== 'blocking') return;
     const left = st.paused ? st.remainingSec : st.remainingSec - Math.round((Date.now() - fetchedAt) / 1000);
     $('left').textContent = clock(left) + (st.paused ? ' (일시정지)' : '');
     $('task').textContent = st.task ? '📌 지금 할 일: ' + st.task : '';
   }
 
   async function refresh() {
-    try { st = await (await fetch('/status')).json(); fetchedAt = Date.now(); } catch { st = null; }
+    try {
+      const res = await fetch('/status');
+      if (!res.ok) throw new Error(res.status);
+      const s = await res.json();
+      if (typeof s.block !== 'boolean') throw new Error('bad status');
+      st = s; fetchedAt = Date.now();
+      view = s.block ? 'blocking' : 'done';
+    } catch {
+      view = 'offline';
+    }
     render();
   }
 
@@ -76,9 +91,17 @@ let blockedPageHTML = #"""
     if (e.key !== 'Enter' || e.isComposing) return;
     const text = $('later').value.trim();
     if (!text) return;
-    await fetch('/later', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
-    $('later').value = '';
-    $('hint').textContent = '✓ 적어뒀어요. 정리 시간에 다시 보여드릴게요.';
+    const hint = $('hint');
+    try {
+      const res = await fetch('/later', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+      if (!res.ok) throw new Error(res.status);
+      $('later').value = '';
+      hint.className = 'hint';
+      hint.textContent = '✓ 적어뒀어요. 정리 시간에 다시 보여드릴게요.';
+    } catch {
+      hint.className = 'hint err';
+      hint.textContent = '저장하지 못했어요. 적은 내용은 그대로 두었어요.';
+    }
   });
 
   refresh();
