@@ -13,7 +13,8 @@ struct PopoverView: View {
     @ObservedObject private var updater = Updater.shared
     @State private var text = ""
     @State private var saved = false
-    @State private var askingPause = false
+    enum Ask { case pause, openApp }
+    @State private var asking: Ask?
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -29,46 +30,60 @@ struct PopoverView: View {
                 Text("📌 \(store.timer.task)").lineLimit(2)
             }
 
-            // 집중 중 일시정지 전에 한 번 묻는다
-            if askingPause {
+            // 집중 중 일시정지 · 앱 열기 전에 한 번 묻는다
+            if let ask = asking {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(L("너가 쉴 자격이 있을까?", "Have you earned this break?")).font(.headline)
+                    Text(ask == .pause ? L("너가 쉴 자격이 있을까?", "Have you earned this break?")
+                                       : L("공부나 해라.", "Get back to studying."))
+                        .font(.headline)
                     HStack {
-                        Button { askingPause = false } label: { Text(L("계속 집중", "Keep Focusing")).frame(maxWidth: .infinity) }
+                        Button { asking = nil } label: { Text(L("계속 집중", "Keep Focusing")).frame(maxWidth: .infinity) }
                             .buttonStyle(.borderedProminent)
                             .tint(.red)
                             .keyboardShortcut(.defaultAction)
                         Button {
-                            askingPause = false
-                            togglePause()
-                        } label: { Text(L("그래도 일시정지", "Pause Anyway")).frame(maxWidth: .infinity) }
+                            asking = nil
+                            ask == .pause ? togglePause() : openApp()
+                        } label: {
+                            Text(ask == .pause ? L("그래도 일시정지", "Pause Anyway") : L("그래도 열기", "Open Anyway"))
+                                .frame(maxWidth: .infinity)
+                        }
                     }
                     .controlSize(.large)
                 }
                 .padding(10)
                 .background(RoundedRectangle(cornerRadius: 10).fill(Color.red.opacity(0.08)))
-            } else {
-            // 진행 중: [일시정지/재개] [앱 열기] [중지] — 앞의 둘은 같은 너비, 중지는 가장 작게
-            HStack {
-                if store.phase == .idle {
+            } else if store.phase == .idle {
+                HStack {
                     Button(action: primary) { Text(L("🍅 시작", "🍅 Start")).frame(maxWidth: .infinity) }
                         .buttonStyle(.borderedProminent)
                         .tint(.red)
-                } else {
-                    Button {
-                        if store.phase == .focus, !store.isPaused { askingPause = true } else { togglePause() }
-                    } label: {
-                        Label(store.isPaused ? L("재개", "Resume") : L("일시정지", "Pause"), systemImage: store.isPaused ? "play.fill" : "pause.fill")
-                            .frame(maxWidth: .infinity)
+                    Button(action: openApp) { Text(L("앱 열기", "Open App")).frame(maxWidth: .infinity) }
+                }
+                .controlSize(.large)
+            } else {
+                // 진행 중: [일시정지/재개] [앱 열기] [중지] = 2 : 1 : 1
+                GeometryReader { g in
+                    let unit = (g.size.width - 16) / 4
+                    HStack(spacing: 8) {
+                        Button {
+                            if store.phase == .focus, !store.isPaused { asking = .pause } else { togglePause() }
+                        } label: {
+                            Label(store.isPaused ? L("재개", "Resume") : L("일시정지", "Pause"), systemImage: store.isPaused ? "play.fill" : "pause.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .frame(width: unit * 2)
+                        .help(store.phase == .focus ? L("집중 중에는 일시정지해도 차단이 유지돼요", "Sites stay blocked while focus is paused") : "")
+                        Button {
+                            if store.phase == .focus, !store.isPaused { asking = .openApp } else { openApp() }
+                        } label: { Text(L("앱 열기", "Open App")).lineLimit(1).frame(maxWidth: .infinity) }
+                        .frame(width: unit)
+                        Button(action: primary) { Text(stopTitle).lineLimit(1).frame(maxWidth: .infinity) }
+                            .frame(width: unit)
                     }
-                    .help(store.phase == .focus ? L("집중 중에는 일시정지해도 차단이 유지돼요", "Sites stay blocked while focus is paused") : "")
+                    .controlSize(.large)
                 }
-                Button(action: openApp) { Text(L("앱 열기", "Open App")).frame(maxWidth: .infinity) }
-                if store.phase != .idle {
-                    Button(stopTitle, action: primary)
-                }
-            }
-            .controlSize(.large)
+                .frame(height: 32)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -111,9 +126,34 @@ struct PopoverView: View {
                     .controlSize(.small)
                 }
             }
+
+            let todos = store.today.todos
+            if !todos.isEmpty {
+                Divider()
+                Text(L("오늘 할 일", "Today's to-dos") + "  \(todos.filter(\.done).count)/\(todos.count)")
+                    .font(.caption.bold()).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(todos.filter { !$0.done } + todos.filter(\.done)) { item in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) { store.toggleTodo(item.id, on: dayKey()) }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: item.done ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(item.done ? item.kind.color : Color.secondary)
+                                Text(item.text).strikethrough(item.done)
+                                    .foregroundStyle(item.done ? .secondary : .primary)
+                                    .lineLimit(1)
+                                Spacer(minLength: 0)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
         }
         .padding(14)
-        .frame(width: 300)
+        .frame(width: 320)
         .onAppear { DispatchQueue.main.async { focused = true } }
     }
 
