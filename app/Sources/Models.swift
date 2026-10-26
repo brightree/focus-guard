@@ -30,9 +30,10 @@ struct Settings: Codable, Equatable {
     var wrapMin = 3
     var breakMin = 7
     var warnAfterMin = 10 // 집중 외 시간에 한 사이트를 연속으로 이만큼 쓰면 경고
-    var stopWaitSec = 30 // 집중 포기 전 강제 대기
     var stopPhrase = "나는 지금 공부를 포기합니다"
     var sites = ["youtube.com", "linkedin.com", "instagram.com", "facebook.com", "x.com", "twitter.com", "reddit.com", "netflix.com"]
+    /// 차단 목록의 하위 도메인이어도 막지 않는 사이트 (예: 공부하며 듣는 유튜브 뮤직)
+    var allowSites = ["music.youtube.com"]
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -42,9 +43,9 @@ struct Settings: Codable, Equatable {
         wrapMin = try c.decodeIfPresent(Int.self, forKey: .wrapMin) ?? d.wrapMin
         breakMin = try c.decodeIfPresent(Int.self, forKey: .breakMin) ?? d.breakMin
         warnAfterMin = try c.decodeIfPresent(Int.self, forKey: .warnAfterMin) ?? d.warnAfterMin
-        stopWaitSec = try c.decodeIfPresent(Int.self, forKey: .stopWaitSec) ?? d.stopWaitSec
         stopPhrase = try c.decodeIfPresent(String.self, forKey: .stopPhrase) ?? d.stopPhrase
         sites = try c.decodeIfPresent([String].self, forKey: .sites) ?? d.sites
+        allowSites = try c.decodeIfPresent([String].self, forKey: .allowSites) ?? d.allowSites
         self = clamped()
     }
 
@@ -52,7 +53,6 @@ struct Settings: Codable, Equatable {
     static let wrapRange = 1...30
     static let breakRange = 1...60
     static let warnRange = 1...120
-    static let stopWaitRange = 0...300
 
     /// 모든 숫자 설정을 허용 범위 안으로 맞춘다 (화면 입력, 저장, 파일 읽기 모두 여기를 거친다)
     func clamped() -> Settings {
@@ -62,7 +62,6 @@ struct Settings: Codable, Equatable {
         s.wrapMin = clamp(wrapMin, Self.wrapRange)
         s.breakMin = clamp(breakMin, Self.breakRange)
         s.warnAfterMin = clamp(warnAfterMin, Self.warnRange)
-        s.stopWaitSec = clamp(stopWaitSec, Self.stopWaitRange)
         return s
     }
 }

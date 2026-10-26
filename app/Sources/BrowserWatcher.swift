@@ -86,9 +86,12 @@ final class BrowserWatcher {
         return run(bid, "tell application id \"\(bid)\" to get URL of \(tabRef) of front window")
     }
 
+    /// 차단 목록에 있는 사이트면 그 도메인을, 아니거나 허용 목록에 있으면 nil
     private func siteOf(_ url: String) -> String? {
         guard let host = URL(string: url)?.host?.lowercased() else { return nil }
-        return store.settings.sites.first { host == $0 || host.hasSuffix("." + $0) }
+        let matches = { (site: String) in host == site || host.hasSuffix("." + site) }
+        if store.settings.allowSites.contains(where: matches) { return nil }
+        return store.settings.sites.first(where: matches)
     }
 
     /// 원래 주소는 # 뒤에 넣는다 (서버로는 보내지지 않음). 영숫자 외에는 모두 인코딩해 따옴표가 섞일 수 없다.

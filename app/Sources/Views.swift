@@ -439,27 +439,17 @@ struct QuickCaptureView: View {
 
 struct GiveUpView: View {
     @EnvironmentObject var store: Store
-    @State private var left: Int
     @State private var phrase = ""
     var onGiveUp: () -> Void
     var close: () -> Void
-    private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
-    init(wait: Int, onGiveUp: @escaping () -> Void, close: @escaping () -> Void) {
-        _left = State(initialValue: wait)
-        self.onGiveUp = onGiveUp
-        self.close = close
-    }
 
     var body: some View {
         let target = store.settings.stopPhrase
         let matches = Self.normalize(phrase) == Self.normalize(target)
-        let canGiveUp = left <= 0 && matches
+        let canGiveUp = matches
         VStack(alignment: .leading, spacing: 12) {
             Text("정말 그만둘까요?").font(.title3.bold())
-            Text(left > 0
-                 ? "\(left)초만 숨을 고르세요. 하고 싶은 게 생겼다면 ⌥⇧L로 적어두고 계속해도 돼요."
-                 : "그래도 그만두려면 아래 문장을 그대로 입력하세요.")
+            Text("하고 싶은 게 생겼다면 ⌥⇧L로 적어두고 계속해도 돼요. 그래도 그만두려면 아래 문장을 그대로 입력하세요.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             // 입력하면 사라지는 안내 글자 대신, 따라 칠 문장을 항상 보여준다
@@ -479,7 +469,6 @@ struct GiveUpView: View {
         }
         .padding(20)
         .frame(width: 440)
-        .onReceive(tick) { _ in if left > 0 { left -= 1 } }
     }
 
     private func giveUp() {
@@ -796,12 +785,13 @@ struct SettingsView: View {
     @EnvironmentObject var store: Store
     @State private var s = Settings()
     @State private var sitesText = ""
+    @State private var allowText = ""
     @State private var saved = false
     @State private var rejected: [String] = []
     var chooseFolder: () -> Void
-    var useGoogleDrive: () -> Void
     var revealFolder: () -> Void
     var toggleLogin: () -> Void
+    var uninstall: () -> Void
     @State private var loginOn = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -813,7 +803,6 @@ struct SettingsView: View {
                 NumberRow(label: "정리 (분)", value: $s.wrapMin, range: Settings.wrapRange)
                 NumberRow(label: "휴식 (분)", value: $s.breakMin, range: Settings.breakRange)
                 NumberRow(label: "연속 사용 경고 (분)", value: $s.warnAfterMin, range: Settings.warnRange)
-                NumberRow(label: "포기 전 대기 (초)", value: $s.stopWaitSec, range: Settings.stopWaitRange)
             }
             Button("기본값으로 (35 · 3 · 7)") {
                 s.focusMin = 35
@@ -831,9 +820,16 @@ struct SettingsView: View {
                 .frame(height: 120)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
 
+            Text("허용할 사이트 (위 목록의 하위 도메인이어도 막지 않음)").font(.headline)
+            TextEditor(text: $allowText)
+                .font(.body.monospaced())
+                .frame(height: 44)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+
             HStack {
                 Button("저장") {
                     s.sites = sitesText.split(whereSeparator: \.isNewline).map(String.init)
+                    s.allowSites = allowText.split(whereSeparator: \.isNewline).map(String.init)
                     rejected = store.updateSettings(s)
                     load()
                     saved = true
@@ -859,16 +855,17 @@ struct SettingsView: View {
             Divider()
             Text("기록 저장 위치").font(.headline)
             Text(store.dataDir.path).font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
-            Text(store.isOnGoogleDrive
-                 ? "☁️ Google Drive에 저장 중이에요. 앱을 다시 설치하거나 업데이트해도 기록이 유지돼요."
-                 : "이 맥에만 저장 중이에요 (매일 자동 백업). Google Drive에 두려면 Google Drive 데스크톱 앱 설치 후 아래 버튼을 누르세요.")
+            Text("매일 자동으로 백업해요. 앱을 다시 빌드하거나 업데이트해도 기록은 그대로예요.")
                 .font(.caption)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
-                Button("Google Drive 사용", action: useGoogleDrive)
                 Button("다른 폴더 선택…", action: chooseFolder)
                 Button("Finder에서 보기", action: revealFolder)
             }
+
+            Divider()
+            Button("Focus Guard 삭제…", role: .destructive, action: uninstall)
+                .disabled(locked)
         }
         .padding(20)
         .frame(width: 480)
@@ -878,6 +875,7 @@ struct SettingsView: View {
     func load() {
         s = store.settings
         sitesText = s.sites.joined(separator: "\n")
+        allowText = s.allowSites.joined(separator: "\n")
     }
 }
 

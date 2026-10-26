@@ -33,15 +33,21 @@ final class Windows: NSObject, NSWindowDelegate {
         }
         w.title = title
         w.level = floating ? .floating : .normal
+        NSApp.setActivationPolicy(.regular) // 창이 있는 동안은 Dock 과 ⌘Tab 에 보인다
         NSApp.activate(ignoringOtherApps: true)
         w.makeKeyAndOrderFront(nil)
     }
 
     func close(_ id: String) { windows[id]?.close() }
 
-    // 닫힌 창의 화면을 놓아준다 (안 그러면 숨은 창도 매초 다시 그려진다)
+    // 닫힌 창의 화면을 놓아준다 (안 그러면 숨은 창도 매초 다시 그려진다).
+    // 열린 창이 하나도 없으면 다시 메뉴 막대 전용으로 돌아간다.
     func windowWillClose(_ note: Notification) {
-        (note.object as? NSWindow)?.contentViewController = nil
+        let closing = note.object as? NSWindow
+        closing?.contentViewController = nil
+        if !windows.values.contains(where: { $0 !== closing && $0.isVisible }) {
+            NSApp.setActivationPolicy(.accessory)
+        }
     }
 }
 
@@ -74,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
     private var lastTitle = ""
 
     func applicationDidFinishLaunching(_ note: Notification) {
+        NSApp.applicationIconImage = Self.tomatoIcon()
         item.button?.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .medium)
         item.button?.target = self
         item.button?.action = #selector(togglePopover)
@@ -99,6 +106,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
     }
 
     func applicationWillTerminate(_ note: Notification) { store.saveNow() }
+
+    /// Dock · ⌘Tab 에 쓸 아이콘 (🍅 이모지를 그린다)
+    static func tomatoIcon() -> NSImage {
+        NSImage(size: NSSize(width: 512, height: 512), flipped: false) { rect in
+            let s = NSAttributedString(string: "🍅", attributes: [.font: NSFont.systemFont(ofSize: 400)])
+            let size = s.size()
+            s.draw(at: NSPoint(x: (rect.width - size.width) / 2, y: (rect.height - size.height) / 2))
+            return true
+        }
+    }
 
     // 앱이 앞에 있어도 알림 배너를 보여준다
     func userNotificationCenter(_ c: UNUserNotificationCenter, willPresent n: UNNotification,
@@ -211,7 +228,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
 
     func presentGiveUp(thenQuit: Bool) {
         Windows.shared.show("giveup", title: "포기하기", floating: true) {
-            GiveUpView(wait: store.settings.stopWaitSec, onGiveUp: { [weak self] in
+            GiveUpView(onGiveUp: { [weak self] in
                 self?.store.stop()
                 if thenQuit { NSApp.terminate(nil) }
             }, close: { Windows.shared.close("giveup") })
@@ -229,9 +246,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
     func showSettings() {
         Windows.shared.show("settings", title: "Focus Guard 설정") {
             SettingsView(chooseFolder: { [weak self] in self?.chooseFolder() },
-                         useGoogleDrive: { [weak self] in self?.useGoogleDrive() },
                          revealFolder: { [weak self] in self?.revealFolder() },
-                         toggleLogin: { [weak self] in self?.toggleLogin() })
+                         toggleLogin: { [weak self] in self?.toggleLogin() },
+                         uninstall: { [weak self] in self?.uninstall() })
         }
     }
 
@@ -260,6 +277,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
         }
     }
 
+    /// 앱을 휴지통으로 옮기고 종료한다. 원하면 기록 폴더도 휴지통으로 옮긴다 (되살릴 수 있음).
+    func uninstall() {
+        guard !store.isBlocking else {
+            return alert("지금은 삭제할 수 없어요", "집중·정리 중에는 삭제할 수 없어요. 끝난 뒤에 다시 해주세요.")
+        }
+        let a = NSAlert()
+        a.messageText = "Focus Guard를 삭제할까요?"
+        a.informativeText = "앱을 휴지통으로 옮기고 종료해요. 로그인 시 자동 실행도 꺼져요."
+        let withData = NSButton(checkboxWithTitle: "기록도 함께 휴지통으로 옮기기\n(\(store.dataDir.path))", target: nil, action: nil)
+        a.accessoryView = withData
+        a.addButton(withTitle: "삭제")
+        a.addButton(withTitle: "취소")
+        NSApp.activate(ignoringOtherApps: true)
+        guard a.runModal() == .alertFirstButtonReturn else { return }
+
+        try? SMAppService.mainApp.unregister()
+        if withData.state == .on {
+            store.stopSaving() // 종료하면서 기록을 다시 만들지 않게
+            NSWorkspace.shared.recycle([store.dataDir]) { _, _ in }
+            UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier ?? "")
+        } else {
+            store.saveNow()
+        }
+        NSWorkspace.shared.recycle([Bundle.main.bundleURL]) { _, error in
+            if let error { self.alert("앱을 휴지통으로 옮기지 못했어요", error.localizedDescription) }
+            NSApp.terminate(nil)
+        }
+    }
+
     func chooseFolder() {
         let p = NSOpenPanel()
         p.canChooseDirectories = true
@@ -269,19 +315,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
         NSApp.activate(ignoringOtherApps: true)
         if p.runModal() == .OK, let url = p.url, let err = store.changeDataDir(to: url) {
             alert("저장 위치를 바꾸지 않았어요", err)
-        }
-    }
-
-    func useGoogleDrive() {
-        if let dir = Store.googleDriveDir() {
-            if let err = store.changeDataDir(to: dir) {
-                alert("저장 위치를 바꾸지 않았어요", err)
-            } else {
-                alert("Google Drive에 저장할게요", "\(dir.path)\n\n이제 기록이 Google Drive에 자동으로 올라가요.")
-            }
-        } else {
-            alert("Google Drive 폴더를 찾지 못했어요",
-                  "Google Drive 데스크톱 앱(google.com/drive/download)을 설치하고 로그인한 뒤 다시 눌러주세요.\n설치돼 있다면 \"다른 폴더 선택…\"으로 내 드라이브 안의 폴더를 직접 골라도 돼요.")
         }
     }
 

@@ -36,7 +36,7 @@ final class Store: ObservableObject {
         if let path = UserDefaults.standard.string(forKey: Self.dirKey) {
             dataDir = URL(fileURLWithPath: path)
         } else {
-            dataDir = Self.localDir // 클라우드 폴더는 사용자가 설정에서 직접 고를 때만 쓴다
+            dataDir = Self.localDir
         }
         load()
         let t = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.secondTick() }
@@ -233,16 +233,20 @@ final class Store: ObservableObject {
     @discardableResult
     func updateSettings(_ s: Settings) -> [String] {
         var s = s.clamped()
-        var sites: [String] = []
         var rejected: [String] = []
-        for raw in s.sites where !raw.trimmingCharacters(in: .whitespaces).isEmpty {
-            if let site = Self.normalizeSite(raw) {
-                if !sites.contains(site) { sites.append(site) }
-            } else {
-                rejected.append(raw)
+        func normalized(_ list: [String]) -> [String] {
+            var out: [String] = []
+            for raw in list where !raw.trimmingCharacters(in: .whitespaces).isEmpty {
+                if let site = Self.normalizeSite(raw) {
+                    if !out.contains(site) { out.append(site) }
+                } else {
+                    rejected.append(raw)
+                }
             }
+            return out
         }
-        s.sites = sites
+        s.sites = normalized(s.sites)
+        s.allowSites = normalized(s.allowSites)
         if s.stopPhrase.trimmingCharacters(in: .whitespaces).isEmpty { s.stopPhrase = Settings().stopPhrase }
         mutate { $0.settings = s }
         return rejected
@@ -349,6 +353,13 @@ final class Store: ObservableObject {
         pendingDistract = [:]
     }
 
+    /// 앱을 삭제할 때: 이후로는 아무것도 저장하지 않는다
+    func stopSaving() {
+        saveWork?.cancel()
+        saveWork = nil
+        saveBlocked = true
+    }
+
     /// 저장이 막혀 있거나 실패 중이면 false — "저장됐다"고 말하면 안 될 때
     var canPersist: Bool { !saveBlocked && saveError == nil }
 
@@ -367,23 +378,7 @@ final class Store: ObservableObject {
     static let localDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("FocusGuard", isDirectory: true)
 
-    /// Google Drive for desktop 이 설치돼 있으면 "내 드라이브/FocusGuard" 를 돌려준다.
-    static func googleDriveDir() -> URL? {
-        let cloud = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/CloudStorage")
-        guard let accounts = try? FileManager.default.contentsOfDirectory(at: cloud, includingPropertiesForKeys: nil) else { return nil }
-        for acc in accounts where acc.lastPathComponent.hasPrefix("GoogleDrive-") {
-            for name in ["My Drive", "내 드라이브"] {
-                let root = acc.appendingPathComponent(name, isDirectory: true)
-                if FileManager.default.fileExists(atPath: root.path) {
-                    return root.appendingPathComponent("FocusGuard", isDirectory: true)
-                }
-            }
-        }
-        return nil
-    }
-
     var dataURL: URL { dataDir.appendingPathComponent("data.json") }
-    var isOnGoogleDrive: Bool { dataDir.path.contains("/CloudStorage/GoogleDrive-") }
 
     private static let encoder: JSONEncoder = {
         let e = JSONEncoder()
