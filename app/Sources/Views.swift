@@ -120,6 +120,7 @@ struct PopoverView: View {
     var stopTitle: String {
         switch store.phase {
         case .wrap: return L("완료", "Done")
+        case .rest: return L("다음 집중", "Next Focus") // 휴식을 끝내고 바로 다음 집중 시작 창을 연다
         default: return L("중지", "Stop")
         }
     }
