@@ -30,10 +30,16 @@ final class BrowserWatcher {
     func tick() {
         let userActive = CGEventSource.secondsSinceLastEventType(.combinedSessionState,
                                                                  eventType: CGEventType(rawValue: ~0)!) < 60
-        guard let bid = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
-              let url = frontURL(bid),
-              let site = siteOf(url)
-        else {
+        let front = NSWorkspace.shared.frontmostApplication
+        let bid = front?.bundleIdentifier
+        let url = bid.flatMap(frontURL) // 브라우저일 때만 AppleScript 로 읽는다
+
+        // 학습 통계: 맨 앞 앱 이름과 (브라우저면) 도메인. 이 앱 자신은 세지 않는다.
+        if bid != Bundle.main.bundleIdentifier {
+            store.reportStudyUsage(app: front?.localizedName, site: url.flatMap(Self.domain), active: userActive)
+        }
+
+        guard let bid, let url, let site = siteOf(url) else {
             _ = store.reportBrowsing(site: nil, active: userActive)
             return
         }
@@ -91,6 +97,14 @@ final class BrowserWatcher {
     }
 
     /// 차단 목록에 있는 사이트면 그 도메인을, 아니거나 허용 목록에 있으면 nil
+    /// 통계용 도메인 ("www." 제거). 차단 페이지 같은 내 맥 주소는 뺀다.
+    static func domain(_ url: String) -> String? {
+        guard var host = URL(string: url)?.host?.lowercased(), host.contains("."),
+              host != "127.0.0.1", host != "localhost" else { return nil }
+        if host.hasPrefix("www.") { host.removeFirst(4) }
+        return host
+    }
+
     private func siteOf(_ url: String) -> String? {
         guard let host = URL(string: url)?.host?.lowercased() else { return nil }
         let matches = { (site: String) in host == site || host.hasSuffix("." + site) }

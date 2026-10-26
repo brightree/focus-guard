@@ -26,6 +26,10 @@ final class Store: ObservableObject {
     var onSecond: (() -> Void)?
     /// 딴짓 시간은 매초 파일에 쓰지 않고 여기 모았다가 30초마다 반영한다 (날짜 → 사이트 → 초)
     private var pendingDistract: [String: [String: Double]] = [:]
+    /// 집중 중 앱 · 사이트 사용 시간도 같은 방식으로 모은다
+    private var pendingStudyApps: [String: [String: Double]] = [:]
+    private var pendingStudySites: [String: [String: Double]] = [:]
+    private var lastStudyTickAt: Date?
     private var lastDistractFlush = Date()
     private var lastBackupKey = ""
 
@@ -220,8 +224,8 @@ final class Store: ObservableObject {
         if let end = data.timer.endTime, data.timer.pausedRemaining == nil, now >= end {
             phaseEnded()
         }
-        if !pendingDistract.isEmpty, now.timeIntervalSince(lastDistractFlush) >= 30 {
-            flushDistract()
+        if hasPending, now.timeIntervalSince(lastDistractFlush) >= 30 {
+            flushPending()
             scheduleSave()
         }
         onSecond?()
@@ -342,16 +346,55 @@ final class Store: ObservableObject {
         return (streak!.warnedMin, site)
     }
 
-    /// 모아둔 딴짓 시간을 기록에 반영한다 (저장 예약은 하지 않음)
-    private func flushDistract() {
+    // MARK: - 학습 통계용 기록 (집중·정리 중 앱 · 사이트)
+
+    /// 1초마다 호출된다. 집중·정리 중이고, 일시정지가 아니고, 사용자가 움직이고 있을 때만 센다.
+    func reportStudyUsage(app: String?, site: String?, active: Bool) {
+        let t = Date()
+        let delta = lastStudyTickAt.map { min(t.timeIntervalSince($0), 5) } ?? 0
+        lastStudyTickAt = t
+        guard settings.trackStudyUsage, phase.isStudy, !isPaused, active, delta > 0 else { return }
+        let k = dayKey(t)
+        if let app { pendingStudyApps[k, default: [:]][app, default: 0] += delta }
+        if let site { pendingStudySites[k, default: [:]][site, default: 0] += delta }
+    }
+
+    /// 여러 날의 앱 · 사이트 사용 시간을 합친다 (아직 반영 안 된 몫 포함)
+    func studyUsage(days: [String]) -> (apps: [String: Double], sites: [String: Double]) {
+        var apps: [String: Double] = [:], sites: [String: Double] = [:]
+        for k in days {
+            for (n, s) in data.days[k]?.studyApps ?? [:] { apps[n, default: 0] += s }
+            for (n, s) in data.days[k]?.studySites ?? [:] { sites[n, default: 0] += s }
+            for (n, s) in pendingStudyApps[k] ?? [:] { apps[n, default: 0] += s }
+            for (n, s) in pendingStudySites[k] ?? [:] { sites[n, default: 0] += s }
+        }
+        return (apps, sites)
+    }
+
+    private var hasPending: Bool { !pendingDistract.isEmpty || !pendingStudyApps.isEmpty || !pendingStudySites.isEmpty }
+
+    /// 모아둔 딴짓 시간 · 학습 기록을 기록에 반영한다 (저장 예약은 하지 않음)
+    private func flushPending() {
         lastDistractFlush = Date()
-        guard !pendingDistract.isEmpty else { return }
+        guard hasPending else { return }
         for (k, sites) in pendingDistract {
             var day = data.days[k] ?? DayStats()
             for (site, sec) in sites { day.distractSec[site, default: 0] += sec }
             data.days[k] = day
         }
+        for (k, apps) in pendingStudyApps {
+            var day = data.days[k] ?? DayStats()
+            for (app, sec) in apps { day.studyApps[app, default: 0] += sec }
+            data.days[k] = day
+        }
+        for (k, sites) in pendingStudySites {
+            var day = data.days[k] ?? DayStats()
+            for (site, sec) in sites { day.studySites[site, default: 0] += sec }
+            data.days[k] = day
+        }
         pendingDistract = [:]
+        pendingStudyApps = [:]
+        pendingStudySites = [:]
     }
 
     /// 앱을 삭제할 때: 이후로는 아무것도 저장하지 않는다
@@ -442,7 +485,7 @@ final class Store: ObservableObject {
     func saveNow() -> Bool {
         saveWork?.cancel()
         saveWork = nil
-        flushDistract()
+        flushPending()
         guard !saveBlocked else { return false }
         let fm = FileManager.default
         do {

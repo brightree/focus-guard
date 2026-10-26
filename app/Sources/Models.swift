@@ -34,6 +34,8 @@ struct Settings: Codable, Equatable {
     var sites = ["youtube.com", "linkedin.com", "instagram.com", "facebook.com", "x.com", "twitter.com", "reddit.com", "netflix.com"]
     /// 차단 목록의 하위 도메인이어도 막지 않는 사이트 (예: 공부하며 듣는 유튜브 뮤직)
     var allowSites = ["music.youtube.com"]
+    /// 집중·정리 중 맨 앞 앱과 사이트(도메인)를 통계용으로 기록할지
+    var trackStudyUsage = true
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -46,6 +48,7 @@ struct Settings: Codable, Equatable {
         stopPhrase = try c.decodeIfPresent(String.self, forKey: .stopPhrase) ?? d.stopPhrase
         sites = try c.decodeIfPresent([String].self, forKey: .sites) ?? d.sites
         allowSites = try c.decodeIfPresent([String].self, forKey: .allowSites) ?? d.allowSites
+        trackStudyUsage = try c.decodeIfPresent(Bool.self, forKey: .trackStudyUsage) ?? d.trackStudyUsage
         self = clamped()
     }
 
@@ -115,6 +118,8 @@ struct DayStats: Codable {
     var abandoned = 0
     var warnings = 0
     var distractSec: [String: Double] = [:]
+    var studyApps: [String: Double] = [:] // 집중·정리 중 맨 앞에 있던 앱 → 초
+    var studySites: [String: Double] = [:] // 집중·정리 중 본 사이트(도메인) → 초
     var log: [LogEntry] = []
 
     init() {}
@@ -126,6 +131,8 @@ struct DayStats: Codable {
         abandoned = try c.decodeIfPresent(Int.self, forKey: .abandoned) ?? 0
         warnings = try c.decodeIfPresent(Int.self, forKey: .warnings) ?? 0
         distractSec = try c.decodeIfPresent([String: Double].self, forKey: .distractSec) ?? [:]
+        studyApps = try c.decodeIfPresent([String: Double].self, forKey: .studyApps) ?? [:]
+        studySites = try c.decodeIfPresent([String: Double].self, forKey: .studySites) ?? [:]
         log = try c.decodeIfPresent([LogEntry].self, forKey: .log) ?? []
     }
 

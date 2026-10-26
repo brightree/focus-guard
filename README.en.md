@@ -12,6 +12,7 @@ Focus Guard is a macOS menu bar app that helps you stay focused with Pomodoro se
 - **A “Later” list:** Capture a thought from the menu bar or press `⌥⇧L` from any app. Review your list during wrap-up.
 - **Daily planning:** Organize tasks into must-do, nice-to-do, and other tasks for today or any other day, then check them off as you go. The plan window opens once each morning, showing anything you planned ahead.
 - **Weekly history:** Review daily study time, completed sessions, wrap-up notes, and time spent on distracting sites. Sessions that cross midnight are split between the two days.
+- **Study stats:** By day or week, see study time, completed sessions, focus success rate, and the top five apps and websites you used while focusing, with their share and minutes.
 - **A deliberate stopping step:** Type a confirmation phrase (configurable) before abandoning a focus session. Spacing and punctuation don't matter.
 
 The app interface and notifications are currently in Korean. The descriptions below use English names for its controls; see the [Korean README](README.md) for the exact labels.
@@ -68,7 +69,7 @@ If you deny browser automation, the menu bar panel shows a warning with a shortc
 
 [BrowserWatcher.swift](app/Sources/BrowserWatcher.swift) checks the active tab of the foreground browser roughly once per second. At the start of a focus session—and when the app launches with focus or wrap-up still active—it also reads the URLs of all tabs in running supported browsers and redirects matching tabs, including those in background windows.
 
-Browsing statistics contain the matched domain and tracked time, not full URLs or page contents. The original URL is encoded in the blocked page's URL fragment so you can return to it later. Fragments are not sent to the local HTTP server, but the full blocked-page URL may remain in browser history or browser sync.
+Browsing statistics contain the matched domain and tracked time, not full URLs or page contents. For study stats, the app also records, during focus and wrap-up only (not while paused or idle for a minute), the name of the frontmost app and, for supported browsers, the active tab's domain, with time spent. You can turn this off in Settings. The original URL is encoded in the blocked page's URL fragment so you can return to it later. Fragments are not sent to the local HTTP server, but the full blocked-page URL may remain in browser history or browser sync.
 
 macOS grants broad browser automation permission. This app uses it to read tab URLs, replace them with the blocked page, and close a tab when you choose “Close this tab” in a reminder.
 

@@ -219,6 +219,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
         }
     }
 
+    func showStats() {
+        Windows.shared.show("stats", title: "학습 통계", resizable: true) { StatsView() }
+    }
+
     func showUpdate() {
         Windows.shared.show("update", title: "업데이트") { UpdateView { Windows.shared.close("update") } }
     }
@@ -238,6 +242,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
         Windows.shared.show("dashboard", title: "Focus Guard", resizable: true) {
             DashboardView(openPlan: { [weak self] in self?.showPlan(day: $0) },
                           openSettings: { [weak self] in self?.showSettings() },
+                          openStats: { [weak self] in self?.showStats() },
                           quit: { [weak self] in self?.quit() },
                           openUpdate: { [weak self] in self?.showUpdate() })
         }

@@ -586,6 +586,7 @@ struct DashboardView: View {
     @EnvironmentObject var store: Store
     var openPlan: (String) -> Void
     var openSettings: () -> Void
+    var openStats: () -> Void
     var quit: () -> Void
     var openUpdate: () -> Void
     @ObservedObject private var updater = Updater.shared
@@ -601,6 +602,7 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Button("📋 할 일") { openPlan(dayKey()) }
+                    Button("📊 통계", action: openStats)
                     Button("⚙︎ 설정", action: openSettings)
                     Spacer()
                     Button("종료", action: quit)
@@ -863,6 +865,129 @@ struct DayDetail: View {
     }
 }
 
+// MARK: - 학습 통계 (일 · 주)
+
+struct StatsView: View {
+    @EnvironmentObject var store: Store
+    enum Span: String, CaseIterable { case day = "일", week = "주" }
+    @State private var span: Span = .day
+    @State private var offset = 0 // 0 = 오늘 / 이번 주, -1 = 어제 / 지난 주 …
+
+    var body: some View {
+        let keys = rangeKeys
+        let usage = store.studyUsage(days: keys)
+        let days = keys.map { store.data.days[$0] ?? DayStats() }
+        let study = keys.map { store.studySec(for: $0) }.reduce(0, +)
+        let sessions = days.map(\.sessions).reduce(0, +)
+        let abandoned = days.map(\.abandoned).reduce(0, +)
+        let tries = sessions + abandoned
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Picker("", selection: $span) {
+                        ForEach(Span.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 110)
+                    .onChange(of: span) { offset = 0 }
+                    Spacer()
+                    Button { offset -= 1 } label: { Image(systemName: "chevron.left") }
+                    Text(rangeTitle(keys)).font(.headline).frame(minWidth: 180)
+                    Button { offset += 1 } label: { Image(systemName: "chevron.right") }
+                        .disabled(offset >= 0)
+                }
+                .buttonStyle(.borderless)
+
+                HStack(spacing: 10) {
+                    Kpi(value: fmtMinutes(study), label: "공부 시간")
+                    Kpi(value: "\(sessions)", label: "완료한 뽀모도로")
+                    Kpi(value: tries == 0 ? "–" : "\(Int((Double(sessions) / Double(tries) * 100).rounded()))%", label: "집중 성공률")
+                    if span == .week {
+                        let studied = keys.filter { store.studySec(for: $0) >= 60 }.count
+                        Kpi(value: "\(studied)/7일", label: "공부한 날")
+                    } else {
+                        Kpi(value: fmtMinutes(days.map(\.distractTotal).reduce(0, +)), label: "딴짓")
+                    }
+                }
+
+                TopCard(title: "집중 중 많이 쓴 앱", items: usage.apps, color: .orange)
+                TopCard(title: "집중 중 많이 본 사이트", items: usage.sites, color: .blue)
+
+                Text(store.settings.trackStudyUsage
+                     ? "집중·정리 중(일시정지·자리 비움 제외) 맨 앞에 있던 앱과 사이트 도메인만 세요. 이 맥에만 저장돼요."
+                     : "앱·사이트 기록이 꺼져 있어요. 설정에서 켤 수 있어요.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(20)
+        }
+        .frame(minWidth: 560, minHeight: 600)
+    }
+
+    private var rangeKeys: [String] {
+        let cal = Calendar.current
+        if span == .day {
+            return [dayKey(cal.date(byAdding: .day, value: offset, to: store.now)!)]
+        }
+        var wc = Calendar(identifier: .gregorian)
+        wc.firstWeekday = 2 // 월요일 시작
+        let monday = wc.date(byAdding: .day, value: 7 * offset, to: wc.dateInterval(of: .weekOfYear, for: store.now)!.start)!
+        return (0..<7).map { dayKey(wc.date(byAdding: .day, value: $0, to: monday)!) }
+    }
+
+    private func rangeTitle(_ keys: [String]) -> String {
+        let today = dayKey(store.now)
+        if span == .day {
+            return dayTitle(keys[0]) + (relativeLabel(keys[0], today: today).map { " (\($0))" } ?? "")
+        }
+        let md = { (k: String) -> String in
+            guard let d = dayKeyFormatter.date(from: k) else { return k }
+            return "\(Calendar.current.component(.month, from: d))/\(Calendar.current.component(.day, from: d))"
+        }
+        return (offset == 0 ? "이번 주 " : "") + "\(md(keys[0])) – \(md(keys[6]))"
+    }
+}
+
+/// 상위 5개를 막대 + 비율 + 시간으로 보여준다
+struct TopCard: View {
+    let title: String
+    let items: [String: Double]
+    let color: Color
+
+    var body: some View {
+        let total = items.values.reduce(0, +)
+        let top = items.sorted { $0.value > $1.value }.prefix(5)
+        Card(title: title) {
+            if total < 60 {
+                Text("아직 기록이 없어요. 집중을 시작하면 쌓여요.").foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(top.enumerated()), id: \.element.key) { i, item in
+                    let share = item.value / total
+                    HStack(spacing: 10) {
+                        Text("\(i + 1)").font(.caption.bold().monospacedDigit()).foregroundStyle(.secondary).frame(width: 14)
+                        Text(item.key).lineLimit(1).frame(width: 150, alignment: .leading)
+                        GeometryReader { g in
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.12))
+                                RoundedRectangle(cornerRadius: 4).fill(color.opacity(i == 0 ? 0.9 : 0.6))
+                                    .frame(width: max(3, g.size.width * share))
+                            }
+                        }
+                        .frame(height: 12)
+                        Text("\(Int((share * 100).rounded()))%").font(.callout.bold().monospacedDigit()).frame(width: 44, alignment: .trailing)
+                        Text(item.value < 60 ? "1분 미만" : fmtMinutes(item.value))
+                            .font(.callout.monospacedDigit()).foregroundStyle(.secondary).frame(width: 84, alignment: .trailing)
+                    }
+                }
+                if items.count > 5 {
+                    let rest = items.sorted { $0.value > $1.value }.dropFirst(5).map(\.value).reduce(0, +)
+                    Text("기타 \(items.count - 5)개 · \(Int((rest / total * 100).rounded()))%").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
 struct Kpi: View {
     let value: String
     let label: String
@@ -936,6 +1061,8 @@ struct SettingsView: View {
                 .font(.body.monospaced())
                 .frame(height: 44)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+
+            Toggle("집중 중 쓴 앱 · 사이트 기록 (학습 통계용, 이 맥에만 저장)", isOn: $s.trackStudyUsage)
 
             HStack {
                 Button("저장") {
