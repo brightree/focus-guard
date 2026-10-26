@@ -627,7 +627,7 @@ struct DashboardView: View {
 
                 Divider()
                 HStack {
-                    Text("Focus Guard 버전 \(updater.current) · \(madeBy)").foregroundStyle(.secondary)
+                    Text("Focus Guard v\(updater.current) · \(madeBy)").foregroundStyle(.secondary)
                     switch updater.state {
                     case .checking: Text("확인 중…").foregroundStyle(.secondary)
                     case .upToDate: Text("최신 버전이에요 ✓").foregroundStyle(.secondary)
@@ -976,7 +976,7 @@ struct SettingsView: View {
             HStack {
                 Button("Focus Guard 삭제…", role: .destructive, action: uninstall)
                 Spacer()
-                Text("버전 \(Updater.shared.current) · \(madeBy)").font(.caption).foregroundStyle(.secondary)
+                Text("v\(Updater.shared.current) · \(madeBy)").font(.caption).foregroundStyle(.secondary)
             }
         }
         .padding(20)
