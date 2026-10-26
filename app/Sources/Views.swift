@@ -795,7 +795,6 @@ struct SettingsView: View {
     @State private var loginOn = SMAppService.mainApp.status == .enabled
 
     var body: some View {
-        let locked = store.isBlocking // 삭제만 막는다 (집중 중 차단을 피하는 수단이 되지 않게)
         VStack(alignment: .leading, spacing: 14) {
             Text("시간").font(.headline)
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
@@ -863,7 +862,6 @@ struct SettingsView: View {
 
             Divider()
             Button("Focus Guard 삭제…", role: .destructive, action: uninstall)
-                .disabled(locked)
         }
         .padding(20)
         .frame(width: 480)

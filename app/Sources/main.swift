@@ -268,9 +268,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
 
     /// 앱을 휴지통으로 옮기고 종료한다. 원하면 기록 폴더도 휴지통으로 옮긴다 (되살릴 수 있음).
     func uninstall() {
-        guard !store.isBlocking else {
-            return alert("지금은 삭제할 수 없어요", "집중·정리 중에는 삭제할 수 없어요. 끝난 뒤에 다시 해주세요.")
-        }
         let a = NSAlert()
         a.messageText = "Focus Guard를 삭제할까요?"
         a.informativeText = "앱을 휴지통으로 옮기고 종료해요. 로그인 시 자동 실행도 꺼져요."

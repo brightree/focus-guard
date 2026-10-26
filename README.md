@@ -114,7 +114,7 @@ Builds are ad-hoc signed, without a Developer ID signature or notarization. macO
 
 ## Uninstall
 
-**Settings → Delete Focus Guard…** turns off launch at login, moves the app to the Trash, and quits. Check the box to move your records folder to the Trash as well. It isn't available during focus or wrap-up. Items in the Trash can still be restored until you empty it.
+**Settings → Delete Focus Guard…** turns off launch at login, moves the app to the Trash, and quits. Check the box to move your records folder to the Trash as well. Items in the Trash can still be restored until you empty it.
 
 To uninstall by hand:
 
