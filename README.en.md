@@ -10,7 +10,7 @@ Focus Guard is a macOS menu bar app that helps you stay focused with Pomodoro se
 - **Website blocking:** Redirects distracting sites to a local blocked page during focus and wrap-up, including while the timer is paused. The default list includes YouTube, Instagram, LinkedIn, Facebook, X, Twitter, Reddit, and Netflix. You can paste full URLs into the list; only the domain is kept, and lines that aren't recognized as domains are reported. An allow list overrides the block list for specific subdomains; by default it contains `music.youtube.com`, so YouTube Music (including its installed Chrome app) keeps playing during focus.
 - **Distraction reminders:** Outside focus and wrap-up, warns you after 10 minutes of tracked use on a listed site, then at further 10-minute intervals. Brief interruptions of up to 3 minutes can count toward the same streak.
 - **A “Later” list:** Capture a thought from the menu bar or press `⌥⇧L` from any app. Review your list during wrap-up.
-- **Daily planning:** Organize tasks into must-do, nice-to-do, and other tasks, then check them off as you go.
+- **Daily planning:** Organize tasks into must-do, nice-to-do, and other tasks for today or any other day, then check them off as you go. The plan window opens once each morning, showing anything you planned ahead.
 - **Weekly history:** Review daily study time, completed sessions, wrap-up notes, and time spent on distracting sites. Sessions that cross midnight are split between the two days.
 - **A deliberate stopping step:** Type a confirmation phrase (configurable) before abandoning a focus session. Spacing and punctuation don't matter.
 

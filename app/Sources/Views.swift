@@ -169,7 +169,7 @@ struct StartView: View {
 extension TodoKind {
     var title: String {
         switch self {
-        case .must: return "오늘 반드시"
+        case .must: return "반드시 할 일"
         case .nice: return "하면 좋은 일"
         case .other: return "기타 업무"
         }
@@ -199,38 +199,50 @@ extension TodoKind {
 
 struct PlanView: View {
     @EnvironmentObject var store: Store
+    @State private var day: String
+
+    init(day: String = dayKey()) { _day = State(initialValue: day) }
 
     var body: some View {
-        let todos = store.today.todos
+        let today = dayKey(store.now)
+        let todos = store.todos(on: day)
         let doneCount = todos.filter(\.done).count
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .center) {
+                    Button { move(-1) } label: { Image(systemName: "chevron.left") }
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(store.now.formatted(.dateTime.month().day().weekday(.wide).locale(Locale(identifier: "ko_KR"))))
-                            .font(.system(size: 24, weight: .bold))
-                        Text(todos.isEmpty ? "오늘 할 일을 정해볼까요?" : "\(todos.count)개 중 \(doneCount)개 완료")
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 6) {
+                            Text(dayTitle(day)).font(.system(size: 24, weight: .bold))
+                            if let badge = relativeLabel(day, today: today) {
+                                Text(badge).font(.caption.bold()).padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                            }
+                        }
+                        Text(subtitle(todos: todos, done: doneCount, today: today)).foregroundStyle(.secondary)
                     }
+                    Button { move(1) } label: { Image(systemName: "chevron.right") }
                     Spacer()
+                    if day != today { Button("오늘") { day = today } }
                     ProgressRing(progress: todos.isEmpty ? 0 : Double(doneCount) / Double(todos.count))
                 }
+                .buttonStyle(.borderless)
                 .padding(.bottom, 4)
 
-                let carry = store.unfinishedFromBefore
-                if todos.isEmpty && !carry.isEmpty {
+                let carry = store.unfinished(before: day)
+                if day >= today && todos.isEmpty && !carry.isEmpty {
                     HStack {
                         Image(systemName: "arrow.uturn.forward.circle.fill").foregroundStyle(.orange)
                         Text("지난번에 못 한 일 \(carry.count)개가 있어요")
                         Spacer()
-                        Button("가져오기") { withAnimation { store.carryOver() } }
+                        Button("가져오기") { withAnimation { store.carryOver(to: day) } }
                     }
                     .padding(12)
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color.orange.opacity(0.12)))
                 }
 
                 ForEach(TodoKind.allCases, id: \.self) { kind in
-                    TodoSection(kind: kind, items: todos.filter { $0.kind == kind })
+                    TodoSection(kind: kind, day: day, items: todos.filter { $0.kind == kind })
                 }
             }
             .padding(20)
@@ -238,6 +250,31 @@ struct PlanView: View {
         .frame(width: 480)
         .frame(minHeight: 520, idealHeight: 620)
     }
+
+    private func move(_ delta: Int) {
+        guard let d = dayKeyFormatter.date(from: day),
+              let next = Calendar.current.date(byAdding: .day, value: delta, to: d) else { return }
+        day = dayKey(next)
+    }
+
+    private func subtitle(todos: [TodoItem], done: Int, today: String) -> String {
+        if !todos.isEmpty { return "\(todos.count)개 중 \(done)개 완료" }
+        if day == today { return "오늘 할 일을 정해볼까요?" }
+        return day > today ? "이 날 할 일을 미리 적어둘까요?" : "이 날은 적은 할 일이 없어요"
+    }
+}
+
+/// "10월 27일 화요일"
+func dayTitle(_ key: String) -> String {
+    guard let d = dayKeyFormatter.date(from: key) else { return key }
+    return d.formatted(.dateTime.month().day().weekday(.wide).locale(Locale(identifier: "ko_KR")))
+}
+
+/// 오늘 · 내일 · 어제 (그 외엔 nil)
+func relativeLabel(_ key: String, today: String) -> String? {
+    guard let d = dayKeyFormatter.date(from: key), let t = dayKeyFormatter.date(from: today),
+          let diff = Calendar.current.dateComponents([.day], from: t, to: d).day else { return nil }
+    return [-1: "어제", 0: "오늘", 1: "내일"][diff]
 }
 
 struct ProgressRing: View {
@@ -259,6 +296,7 @@ struct ProgressRing: View {
 struct TodoSection: View {
     @EnvironmentObject var store: Store
     let kind: TodoKind
+    let day: String
     let items: [TodoItem]
     @State private var draft = ""
 
@@ -278,7 +316,7 @@ struct TodoSection: View {
             .padding(.bottom, 8)
 
             ForEach(sorted) { item in
-                TodoRow(item: item, color: kind.color)
+                TodoRow(item: item, day: day, color: kind.color)
                 Divider().opacity(0.5)
             }
 
@@ -287,7 +325,7 @@ struct TodoSection: View {
                 TextField(kind.placeholder, text: $draft)
                     .textFieldStyle(.plain)
                     .onSubmit {
-                        withAnimation { store.addTodo(draft, kind: kind) }
+                        withAnimation { store.addTodo(draft, kind: kind, on: day) }
                         draft = ""
                     }
             }
@@ -304,13 +342,14 @@ struct TodoSection: View {
 struct TodoRow: View {
     @EnvironmentObject var store: Store
     let item: TodoItem
+    let day: String
     let color: Color
     @State private var hover = false
 
     var body: some View {
         HStack(spacing: 10) {
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) { store.toggleTodo(item.id) }
+                withAnimation(.easeInOut(duration: 0.2)) { store.toggleTodo(item.id, on: day) }
             } label: {
                 Image(systemName: item.done ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 18))
@@ -325,7 +364,7 @@ struct TodoRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Button {
-                withAnimation { store.deleteTodo(item.id) }
+                withAnimation { store.deleteTodo(item.id, on: day) }
             } label: {
                 Image(systemName: "trash").foregroundStyle(.secondary)
             }
@@ -494,7 +533,7 @@ private let weekdaySymbols = ["일", "월", "화", "수", "목", "금", "토"]
 
 struct DashboardView: View {
     @EnvironmentObject var store: Store
-    var openPlan: () -> Void
+    var openPlan: (String) -> Void
     var openSettings: () -> Void
     var quit: () -> Void
     @State private var weekOffset = 0
@@ -508,7 +547,7 @@ struct DashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Button("📋 오늘 할 일", action: openPlan)
+                    Button("📋 할 일") { openPlan(dayKey()) }
                     Button("⚙︎ 설정", action: openSettings)
                     Spacer()
                     Button("종료", action: quit)
@@ -519,7 +558,6 @@ struct DashboardView: View {
                     Button { changeWeek(-1) } label: { Image(systemName: "chevron.left") }
                     Text(weekTitle(dates)).font(.title3.bold())
                     Button { changeWeek(1) } label: { Image(systemName: "chevron.right") }
-                        .disabled(weekOffset >= 0)
                     Spacer()
                     Text("이번 주 공부 \(fmtMinutes(secs.reduce(0, +))) · 🍅 \(sessions)개")
                         .foregroundStyle(.secondary)
@@ -530,7 +568,7 @@ struct DashboardView: View {
                     WeekChart(dates: dates, secs: secs, selected: $selected)
                 }
 
-                DayDetail(key: selected)
+                DayDetail(key: selected, openPlan: openPlan)
 
                 laterCard
             }
@@ -551,7 +589,7 @@ struct DashboardView: View {
     }
 
     func changeWeek(_ delta: Int) {
-        weekOffset = min(0, weekOffset + delta)
+        weekOffset += delta
         // 이번 주로 돌아오면 오늘, 지난 주면 그 주 월요일을 고른다
         selected = weekOffset == 0 ? dayKey(store.now) : dayKey(weekDates[0])
     }
@@ -654,7 +692,6 @@ struct WeekChart: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(isFuture)
     }
 
     func shortTime(_ sec: Double) -> String {
@@ -667,22 +704,29 @@ struct WeekChart: View {
 struct DayDetail: View {
     @EnvironmentObject var store: Store
     let key: String
+    var openPlan: (String) -> Void
 
     var body: some View {
         let day = store.data.days[key] ?? DayStats()
-        let isToday = key == dayKey(store.now)
+        let today = dayKey(store.now)
+        let isFuture = key > today
         VStack(alignment: .leading, spacing: 12) {
-            Text(title + (isToday ? " (오늘)" : "")).font(.title3.bold())
-            HStack(spacing: 10) {
-                Kpi(value: fmtMinutes(store.studySec(for: key)), label: "공부")
-                Kpi(value: "\(day.sessions)", label: "완료한 뽀모도로")
-                Kpi(value: fmtMinutes(day.distractTotal), label: "딴짓")
+            Text(dayTitle(key) + (relativeLabel(key, today: today).map { " (\($0))" } ?? "")).font(.title3.bold())
+            if !isFuture {
+                HStack(spacing: 10) {
+                    Kpi(value: fmtMinutes(store.studySec(for: key)), label: "공부")
+                    Kpi(value: "\(day.sessions)", label: "완료한 뽀모도로")
+                    Kpi(value: fmtMinutes(day.distractTotal), label: "딴짓")
+                }
             }
 
             Card(title: "할 일") {
-                if day.todos.isEmpty {
-                    Text(isToday ? "메뉴 막대 🍅 → 오늘 할 일에서 적을 수 있어요." : "이 날은 적은 할 일이 없어요.")
-                        .foregroundStyle(.secondary)
+                HStack {
+                    if day.todos.isEmpty {
+                        Text(isFuture ? "아직 적은 할 일이 없어요." : "이 날은 적은 할 일이 없어요.").foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(day.todos.isEmpty ? "✏️ 할 일 적기" : "✏️ 편집") { openPlan(key) }
                 }
                 ForEach(TodoKind.allCases, id: \.self) { kind in
                     let items = day.todos.filter { $0.kind == kind }
@@ -706,48 +750,45 @@ struct DayDetail: View {
                 }
             }
 
-            Card(title: "한 일") {
-                if day.log.isEmpty {
-                    Text("이 날은 뽀모도로 기록이 없어요.").foregroundStyle(.secondary)
-                }
-                ForEach(day.log) { l in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(l.done ? "🍅" : "✖️") \(l.end.formatted(date: .omitted, time: .shortened)) — \(l.task.isEmpty ? "(할 일 없음)" : l.task) \(l.done ? "(\(l.minutes ?? 0)분)" : "(포기)")")
-                        if !l.note.isEmpty {
-                            Text("📝 \(l.note)").font(.callout).foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+            if !isFuture {
+                Card(title: "한 일") {
+                    if day.log.isEmpty {
+                        Text("이 날은 뽀모도로 기록이 없어요.").foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 2)
+                    ForEach(day.log) { l in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(l.done ? "🍅" : "✖️") \(l.end.formatted(date: .omitted, time: .shortened)) — \(l.task.isEmpty ? "(할 일 없음)" : l.task) \(l.done ? "(\(l.minutes ?? 0)분)" : "(포기)")")
+                            if !l.note.isEmpty {
+                                Text("📝 \(l.note)").font(.callout).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
                 }
-            }
 
-            Card(title: "딴짓 사이트") {
-                let entries = day.distractSec.sorted { $0.value > $1.value }
-                if entries.isEmpty {
-                    Text("딴짓 기록이 없어요 👏").foregroundStyle(.secondary)
-                }
-                let maxV = entries.first?.value ?? 1
-                ForEach(entries, id: \.key) { site, sec in
-                    HStack {
-                        Text(site).frame(width: 130, alignment: .leading)
-                        GeometryReader { g in
-                            RoundedRectangle(cornerRadius: 3).fill(.secondary.opacity(0.5))
-                                .frame(width: max(2, g.size.width * sec / maxV))
-                        }
-                        .frame(height: 10)
-                        Text(fmtMinutes(sec)).monospacedDigit().foregroundStyle(.secondary).frame(width: 70, alignment: .trailing)
+                Card(title: "딴짓 사이트") {
+                    let entries = day.distractSec.sorted { $0.value > $1.value }
+                    if entries.isEmpty {
+                        Text("딴짓 기록이 없어요 👏").foregroundStyle(.secondary)
                     }
+                    let maxV = entries.first?.value ?? 1
+                    ForEach(entries, id: \.key) { site, sec in
+                        HStack {
+                            Text(site).frame(width: 130, alignment: .leading)
+                            GeometryReader { g in
+                                RoundedRectangle(cornerRadius: 3).fill(.secondary.opacity(0.5))
+                                    .frame(width: max(2, g.size.width * sec / maxV))
+                            }
+                            .frame(height: 10)
+                            Text(fmtMinutes(sec)).monospacedDigit().foregroundStyle(.secondary).frame(width: 70, alignment: .trailing)
+                        }
+                    }
+                    Text("연속 사용 경고 \(day.warnings)회 · 중도 포기 \(day.abandoned)회")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-                Text("연속 사용 경고 \(day.warnings)회 · 중도 포기 \(day.abandoned)회")
-                    .font(.caption).foregroundStyle(.secondary)
             }
         }
-    }
-
-    var title: String {
-        guard let d = dayKeyFormatter.date(from: key) else { return key }
-        return d.formatted(.dateTime.month().day().weekday(.wide).locale(Locale(identifier: "ko_KR")))
     }
 }
 

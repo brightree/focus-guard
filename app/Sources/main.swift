@@ -172,7 +172,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
     }
 
     func showPlan() {
-        Windows.shared.show("plan", title: "오늘 할 일") { PlanView() }
+        showPlan(day: dayKey())
+    }
+
+    func showPlan(day: String) {
+        Windows.shared.show("plan", title: "할 일") { PlanView(day: day) }
     }
 
     func phaseChanged(from old: Phase, to new: Phase) {
@@ -226,7 +230,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
 
     func showDashboard() {
         Windows.shared.show("dashboard", title: "Focus Guard", resizable: true) {
-            DashboardView(openPlan: { [weak self] in self?.showPlan() },
+            DashboardView(openPlan: { [weak self] in self?.showPlan(day: $0) },
                           openSettings: { [weak self] in self?.showSettings() },
                           quit: { [weak self] in self?.quit() })
         }

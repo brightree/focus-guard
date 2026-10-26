@@ -280,40 +280,41 @@ final class Store: ObservableObject {
     func deleteLater(_ id: UUID) { mutate { $0.later.removeAll { $0.id == id } } }
     func clearDoneLater() { mutate { $0.later.removeAll { $0.done } } }
 
-    // MARK: - 오늘 할 일 (아침 계획)
+    // MARK: - 할 일 (오늘 또는 미리 적어두는 다른 날)
 
-    func addTodo(_ text: String, kind: TodoKind) {
+    func todos(on day: String) -> [TodoItem] { data.days[day]?.todos ?? [] }
+
+    func addTodo(_ text: String, kind: TodoKind, on day: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
-        updateToday { $0.todos.append(TodoItem(text: t, kind: kind)) }
+        updateDay(day) { $0.todos.append(TodoItem(text: t, kind: kind)) }
     }
 
-    func toggleTodo(_ id: UUID) {
-        updateToday { d in
+    func toggleTodo(_ id: UUID, on day: String) {
+        updateDay(day) { d in
             if let i = d.todos.firstIndex(where: { $0.id == id }) { d.todos[i].done.toggle() }
         }
     }
 
-    func deleteTodo(_ id: UUID) { updateToday { $0.todos.removeAll { $0.id == id } } }
+    func deleteTodo(_ id: UUID, on day: String) { updateDay(day) { $0.todos.removeAll { $0.id == id } } }
 
-    /// 가장 최근에 계획을 세운 날의 못 한 일
-    var unfinishedFromBefore: [TodoItem] {
-        let today = dayKey(now)
-        guard let key = data.days.keys.filter({ $0 < today && !(data.days[$0]?.todos.isEmpty ?? true) }).max() else { return [] }
+    /// 그 날 이전에 할 일을 적었던 가장 가까운 날의 못 한 일
+    func unfinished(before day: String) -> [TodoItem] {
+        guard let key = data.days.keys.filter({ $0 < day && !(data.days[$0]?.todos.isEmpty ?? true) }).max() else { return [] }
         return data.days[key]!.todos.filter { !$0.done }
     }
 
-    func carryOver() {
-        let items = unfinishedFromBefore.map { TodoItem(text: $0.text, kind: $0.kind) }
-        updateToday { $0.todos.append(contentsOf: items) }
+    func carryOver(to day: String) {
+        let items = unfinished(before: day).map { TodoItem(text: $0.text, kind: $0.kind) }
+        updateDay(day) { $0.todos.append(contentsOf: items) }
     }
 
-    /// 오늘 처음이면 true (아침 계획 창을 하루 한 번만 자동으로 띄우기 위해)
+    /// 오늘 처음이면 true — 아침 계획 창을 하루 한 번 띄운다 (미리 적어둔 할 일이 있어도 보여준다)
     func shouldShowMorningPlan() -> Bool {
         let k = dayKey()
         guard data.planShownDay != k else { return false }
         mutate { $0.planShownDay = k }
-        return today.todos.isEmpty
+        return true
     }
 
     // MARK: - 브라우저 감시가 보내는 딴짓 보고
