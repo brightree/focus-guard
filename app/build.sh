@@ -49,7 +49,22 @@ PLIST
 plutil -insert CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
 plutil -insert CFBundleVersion -string "$VERSION" "$APP/Contents/Info.plist"
 
-codesign --force --sign - "$APP" >/dev/null
+# 서명: ../.signing 에 인증서가 있으면 그걸로 (배포용 — 앱 정체가 업데이트해도 같아서 브라우저 권한을 한 번만 묻는다).
+# 없으면 ad-hoc 서명 (소스로 직접 빌드하는 경우).
+SIGN_DIR=../.signing
+if [[ -f "$SIGN_DIR/FocusGuard.keychain-db" ]]; then
+  KC="$(cd "$SIGN_DIR" && pwd)/FocusGuard.keychain-db"
+  ORIG=(${(f)"$(security list-keychains -d user | tr -d '" ')"})
+  restore_keychains() { security list-keychains -d user -s "${ORIG[@]}" }
+  trap 'restore_keychains; rm -rf "$TMP"' EXIT
+  security list-keychains -d user -s "${ORIG[@]}" "$KC" # 서명하는 동안만 검색 목록에 추가
+  security unlock-keychain -p "$(cat "$SIGN_DIR/keychain-password")" "$KC"
+  IDENTITY=$(security find-identity -p codesigning "$KC" | awk '/"Focus Guard Signing"/ {print $2; exit}')
+  codesign --force --keychain "$KC" --sign "$IDENTITY" "$APP" >/dev/null
+  restore_keychains
+else
+  codesign --force --sign - "$APP" >/dev/null
+fi
 # 바뀐 아이콘이 바로 보이도록 시스템에 다시 등록
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" || true
 echo "built $(pwd)/$APP (v$VERSION)"

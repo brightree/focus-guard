@@ -66,7 +66,7 @@ The app checks GitHub for a new release once a day. When one is available, you g
 - **Downloaded app:** the new FocusGuard.zip is downloaded and replaces the app in place.
 - **Built from source:** the app runs `git pull` and `build.sh` in its folder.
 
-Because each release is a new unsigned build, macOS may ask for browser automation permission again after an update.
+Releases are signed with the same certificate, so browser automation permission granted once carries over to later updates. (Updating from 1.6.0 or earlier asks one more time.)
 
 On version 1.1.1 or earlier, update once from Terminal:
 
@@ -145,7 +145,7 @@ Browser scripts run synchronously on the main thread with a two-second timeout p
 
 Focus Guard is a self-management aid. Quitting or force-quitting the app, denying automation permission, or using an unsupported browser bypasses blocking.
 
-Builds are ad-hoc signed, without a Developer ID signature or notarization, so Gatekeeper blocks the downloaded app until you allow it once (see Install). macOS may ask for automation permission again after an update or rebuild.
+Releases are signed with a self-signed certificate, not an Apple Developer ID, and aren't notarized, so Gatekeeper blocks the downloaded app until you allow it once (see Install). Builds from source are ad-hoc signed, so macOS may ask for automation permission again after each rebuild.
 
 ## Uninstall
 
