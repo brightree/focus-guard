@@ -1,6 +1,9 @@
 # 🍅 Focus Guard
 
-Focus Guard is a macOS menu bar app that helps you build study habits with Pomodoro sessions, website blocking, and a place to park distractions for later.
+Focus Guard is a menu bar (macOS) and system tray (Windows) app that helps you build study habits with Pomodoro sessions, website blocking, and a place to park distractions for later.
+
+- **Mac:** see [Install](#install).
+- **Windows:** see [Windows](#windows).
 
 ## Features
 
@@ -75,6 +78,27 @@ killall FocusGuard; cd ~/focus-guard && git pull && cd app && ./build.sh && open
 ```
 
 The current version is shown at the bottom of Settings and the main window. See [CHANGELOG.md](CHANGELOG.md) for changes.
+
+## Windows
+
+The Windows version has the same features and data format. It lives in the system tray (the 🍅 shows the minutes left).
+
+### Install
+
+1. Download **FocusGuard-Windows.zip** from the [latest release](https://github.com/brightree/focus-guard/releases/latest).
+2. Unzip it into a folder you own, such as `Documents\FocusGuard` (not `Program Files`, so the app can update itself).
+3. Run **FocusGuard.exe**. Because the app isn't signed, Windows SmartScreen may say "Windows protected your PC": click **More info → Run anyway**.
+4. If you don't see the 🍅, click the **^** arrow next to the clock and drag it onto the taskbar.
+
+Requirements: Windows 10 or 11 (64-bit). Supported browsers: Chrome, Edge, Brave, Firefox, Vivaldi, Opera, and Naver Whale.
+
+### Differences from the Mac version
+
+- "Later" shortcut is **Ctrl+Alt+L** (Alt+Shift switches the input language on Windows).
+- Blocking reads the address bar of the **active tab** through Windows UI Automation. Tabs that were already open are blocked when you switch to them. Reading the address bar can make some browsers turn on their accessibility support, which uses a little more memory.
+- Data is stored in `%APPDATA%\FocusGuard\data.json`; settings such as the storage folder and update checks are in `%LOCALAPPDATA%\FocusGuard`. If something goes wrong, `%LOCALAPPDATA%\FocusGuard\crash.log` has the details.
+- Updates download **FocusGuard-Windows.zip** from the latest release and replace `FocusGuard.exe` in place.
+- **Settings → Delete Focus Guard…** removes the app, turns off launch at login, and can move your data to the Recycle Bin.
 
 ## Everyday use
 
@@ -162,6 +186,10 @@ To uninstall by hand:
 ## Project structure
 
 ```text
+windows/                   Windows version (.NET, WinForms)
+  FocusGuard.Core/         Timer, records, settings, local server — shared rules, tested on any OS
+  FocusGuard.Core.Tests/   Unit tests
+  FocusGuard.App/          Tray app, windows, address-bar watcher, updater
 app/
   VERSION                  App version (shown in Settings)
   build.sh                 Builds the app with swiftc; no Xcode project required

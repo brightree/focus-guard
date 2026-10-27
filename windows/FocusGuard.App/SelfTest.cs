@@ -78,10 +78,17 @@ static class SelfTest
 
             step("blocked page + status over HTTP", () =>
             {
-                using var http = new HttpClient();
-                var page = http.GetStringAsync($"http://127.0.0.1:{port}/blocked").Result;
-                if (!page.Contains("<html")) throw new Exception("no html");
-                var status = http.GetStringAsync($"http://127.0.0.1:{port}/status").Result;
+                // 서버는 화면 스레드에서 답을 만든다 → 요청은 다른 스레드에서 보내고, 화면 스레드는 계속 메시지를 처리한다
+                string get(string path)
+                {
+                    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                    var t = Task.Run(() => http.GetStringAsync($"http://127.0.0.1:{port}{path}"));
+                    var until = DateTime.Now.AddSeconds(12);
+                    while (!t.IsCompleted && DateTime.Now < until) { Application.DoEvents(); Thread.Sleep(10); }
+                    return t.IsCompletedSuccessfully ? t.Result : throw new Exception($"{path}: {t.Exception?.GetBaseException().Message ?? "timeout"}");
+                }
+                if (!get("/blocked").Contains("<html")) throw new Exception("no html");
+                var status = get("/status");
                 if (!status.Contains("\"block\":")) throw new Exception(status);
             });
             step("save data", () => { if (!store.SaveNow()) throw new Exception(store.SaveError); });
