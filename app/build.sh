@@ -9,7 +9,17 @@ VERSION=$(tr -d '[:space:]' < VERSION) # 버전은 app/VERSION 한 곳에서 관
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-swiftc -O -target "$(uname -m)-apple-macos14.0" -o "$APP/Contents/MacOS/FocusGuard" Sources/*.swift
+# 기본: 이 맥의 칩에 맞게 빌드. UNIVERSAL=1 이면 Apple Silicon + Intel 둘 다 (배포용, release.sh 가 사용)
+if [[ "${UNIVERSAL:-0}" == 1 ]]; then
+  BIN=$(mktemp -d)
+  for arch in arm64 x86_64; do
+    swiftc -O -target "$arch-apple-macos14.0" -o "$BIN/FocusGuard-$arch" Sources/*.swift
+  done
+  lipo -create -output "$APP/Contents/MacOS/FocusGuard" "$BIN/FocusGuard-arm64" "$BIN/FocusGuard-x86_64"
+  rm -rf "$BIN"
+else
+  swiftc -O -target "$(uname -m)-apple-macos14.0" -o "$APP/Contents/MacOS/FocusGuard" Sources/*.swift
+fi
 
 # 🍅 앱 아이콘 (Finder · Dock · ⌘Tab 에 쓰인다)
 TMP=$(mktemp -d)

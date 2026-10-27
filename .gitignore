@@ -11,3 +11,6 @@ backups/
 
 # 로컬 전용 파일
 INTERNAL.md
+
+# 배포용 압축 파일
+*.zip

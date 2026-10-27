@@ -1,9 +1,10 @@
 import AppKit
 
 // 새 버전 확인과 버튼 하나로 업데이트.
-// - 하루 한 번 깃허브의 app/VERSION (글자 몇 개)만 읽어 내 버전과 비교한다. 보내는 정보는 없다.
-// - 업데이트: 이 앱이 들어 있는 저장소 폴더에서 git pull → build.sh → 새 버전으로 다시 켠다.
-//   README 의 한 줄 명령(git clone)으로 설치한 경우에만 동작한다.
+// - 하루 한 번 깃허브의 최신 릴리스(버전 번호 · 바뀐 내용)만 읽어 내 버전과 비교한다. 보내는 정보는 없다.
+// - 업데이트:
+//   · 다운로드해서 설치한 앱 → 릴리스의 FocusGuard.zip 을 받아 지금 앱 자리에 바꿔 넣고 다시 켠다.
+//   · git clone 으로 설치한 앱 → 그 폴더에서 git pull → build.sh 후 다시 켠다.
 
 final class Updater: ObservableObject {
     static let shared = Updater()
@@ -20,7 +21,8 @@ final class Updater: ObservableObject {
     @Published private(set) var state: State = .idle
     @Published private(set) var notes = "" // CHANGELOG 중 새 버전 부분
 
-    private static let raw = "https://raw.githubusercontent.com/brightree/focus-guard/main/"
+    private static let latestAPI = "https://api.github.com/repos/brightree/focus-guard/releases/latest"
+    private static let latestZip = "https://github.com/brightree/focus-guard/releases/latest/download/FocusGuard.zip"
     private static let lastCheckKey = "lastUpdateCheck"
     private static let notifiedKey = "notifiedVersion"
 
@@ -53,34 +55,37 @@ final class Updater: ObservableObject {
     func check() {
         guard state != .checking, state != .updating else { return }
         state = .checking
-        fetch("app/VERSION") { [weak self] text in
-            guard let self else { return }
-            UserDefaults.standard.set(Date(), forKey: Self.lastCheckKey)
-            guard let remote = text?.trimmingCharacters(in: .whitespacesAndNewlines), !remote.isEmpty else {
-                self.state = .failed(L("새 버전을 확인하지 못했어요. 인터넷 연결을 확인해 주세요.", "Couldn't check for updates. Check your internet connection."))
-                return
-            }
-            guard Self.isNewer(remote, than: self.current) else {
-                self.state = .upToDate
-                return
-            }
-            self.state = .available(remote)
-            self.fetch("CHANGELOG.md") { md in
-                self.notes = md.map { Self.notes(in: $0, from: remote, to: self.current) } ?? ""
-            }
-            if UserDefaults.standard.string(forKey: Self.notifiedKey) != remote {
-                UserDefaults.standard.set(remote, forKey: Self.notifiedKey)
-                Store.shared.notify(L("🍅 새 버전 \(remote)이 나왔어요", "🍅 Focus Guard \(remote) is available"), L("메뉴 막대 🍅 → 업데이트를 누르면 바로 설치돼요.", "Click 🍅 in the menu bar, then Update to install it."))
-            }
+        var req = URLRequest(url: URL(string: Self.latestAPI)!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        URLSession.shared.dataTask(with: req) { data, resp, _ in
+            let json = (resp as? HTTPURLResponse)?.statusCode == 200
+                ? data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } : nil
+            DispatchQueue.main.async { self.handle(release: json) }
+        }.resume()
+    }
+
+    private func handle(release json: [String: Any]?) {
+        UserDefaults.standard.set(Date(), forKey: Self.lastCheckKey)
+        guard let tag = json?["tag_name"] as? String, !tag.isEmpty else {
+            state = .failed(L("새 버전을 확인하지 못했어요. 인터넷 연결을 확인해 주세요.", "Couldn't check for updates. Check your internet connection."))
+            return
+        }
+        let remote = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+        guard Self.isNewer(remote, than: current) else {
+            state = .upToDate
+            return
+        }
+        notes = (json?["body"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        state = .available(remote)
+        if UserDefaults.standard.string(forKey: Self.notifiedKey) != remote {
+            UserDefaults.standard.set(remote, forKey: Self.notifiedKey)
+            Store.shared.notify(L("🍅 새 버전 \(remote)이 나왔어요", "🍅 Focus Guard \(remote) is available"), L("메뉴 막대 🍅 → 업데이트를 누르면 바로 설치돼요.", "Click 🍅 in the menu bar, then Update to install it."))
         }
     }
 
     /// 최신 코드를 받아 빌드하고, 성공하면 새 버전으로 다시 켠다. 실패하면 지금 버전 그대로 둔다.
     func update() {
-        guard let repo = repoDir else {
-            state = .failed(L("자동 업데이트는 README의 설치 명령으로 설치한 경우에만 돼요. README 명령을 다시 붙여넣어 주세요.", "Automatic updates only work if you installed with the command in the README. Paste that command again to update."))
-            return
-        }
+        guard let repo = repoDir else { return downloadUpdate() }
         state = .updating
         Store.shared.saveNow()
         DispatchQueue.global(qos: .userInitiated).async {
@@ -90,29 +95,63 @@ final class Updater: ObservableObject {
                     self.state = .failed(L("업데이트하지 못했어요. 지금 버전은 그대로예요.\n", "Update failed. You're still on the current version.\n") + log.suffix(400))
                     return
                 }
-                // 이 앱이 꺼진 뒤 새 앱을 켜도록 맡겨 두고 종료한다 (포트가 겹치지 않게)
-                let app = Bundle.main.bundleURL.path
-                _ = Self.shell("(sleep 1; open \"\(app)\") >/dev/null 2>&1 &", in: repo, wait: false)
-                NSApp.terminate(nil)
+                self.relaunch()
             }
         }
     }
 
-    // MARK: - 내부
-
-    private func fetch(_ path: String, _ done: @escaping (String?) -> Void) {
-        // 주소 끝을 매번 바꿔서 CDN 에 저장된 옛 사본(최대 5분) 대신 최신 파일을 받는다
-        let url = URL(string: Self.raw + path + "?t=\(Int(Date().timeIntervalSince1970))")!
-        let req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
-        URLSession.shared.dataTask(with: req) { data, resp, _ in
-            let ok = (resp as? HTTPURLResponse)?.statusCode == 200
-            let text = ok ? data.flatMap { String(data: $0, encoding: .utf8) } : nil
-            DispatchQueue.main.async { done(text) }
+    /// 릴리스의 FocusGuard.zip 을 받아 풀고, 버전을 확인한 뒤 지금 앱과 바꿔 넣는다.
+    private func downloadUpdate() {
+        state = .updating
+        Store.shared.saveNow()
+        let expected = latest
+        URLSession.shared.downloadTask(with: URL(string: Self.latestZip)!) { file, resp, error in
+            // 받은 임시 파일은 이 블록이 끝나면 지워지므로 여기서 바로 푼다
+            let result = Self.install(zip: file, ok: (resp as? HTTPURLResponse)?.statusCode == 200, expected: expected)
+            DispatchQueue.main.async {
+                if let msg = result {
+                    self.state = .failed(L("업데이트하지 못했어요. 지금 버전은 그대로예요.\n", "Update failed. You're still on the current version.\n") + msg)
+                } else {
+                    self.relaunch()
+                }
+            }
         }.resume()
     }
 
+    /// 성공하면 nil, 실패하면 이유
+    static func install(zip: URL?, ok: Bool, expected: String?, target: URL = Bundle.main.bundleURL) -> String? {
+        guard let zip, ok else { return L("다운로드에 실패했어요.", "The download failed.") }
+        let fm = FileManager.default
+        let work = fm.temporaryDirectory.appendingPathComponent("FocusGuardUpdate-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: work) }
+        let (unzipped, log) = shell("/usr/bin/ditto -x -k \"\(zip.path)\" \"\(work.path)\"", in: fm.temporaryDirectory)
+        let newApp = work.appendingPathComponent("FocusGuard.app")
+        guard unzipped, let info = NSDictionary(contentsOf: newApp.appendingPathComponent("Contents/Info.plist")),
+              info["CFBundleIdentifier"] as? String == "local.focusguard.app" else {
+            return L("받은 파일이 올바르지 않아요.", "The downloaded file isn't valid.") + " " + log.suffix(200)
+        }
+        if let expected, info["CFBundleShortVersionString"] as? String != expected {
+            return L("받은 버전이 예상과 달라요.", "The downloaded version doesn't match.")
+        }
+        do {
+            _ = try fm.replaceItemAt(target, withItemAt: newApp)
+        } catch {
+            return L("앱을 바꿔 넣지 못했어요: ", "Couldn't replace the app: ") + error.localizedDescription
+        }
+        return nil
+    }
+
+    /// 이 앱이 꺼진 뒤 새 앱을 켜도록 맡겨 두고 종료한다 (포트가 겹치지 않게)
+    private func relaunch() {
+        let app = Bundle.main.bundleURL.path
+        _ = Self.shell("(sleep 1; open \"\(app)\") >/dev/null 2>&1 &", in: FileManager.default.temporaryDirectory, wait: false)
+        NSApp.terminate(nil)
+    }
+
+    // MARK: - 내부
+
     @discardableResult
-    private static func shell(_ command: String, in dir: URL, wait: Bool = true) -> (Bool, String) {
+    static func shell(_ command: String, in dir: URL, wait: Bool = true) -> (Bool, String) {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/zsh")
         p.arguments = ["-c", command]
@@ -135,20 +174,5 @@ final class Updater: ObservableObject {
             if l != r { return l > r }
         }
         return false
-    }
-
-    /// CHANGELOG 에서 "## 새 버전" 부터 "## 지금 버전" 직전까지 (건너뛴 버전이 있으면 모두)
-    static func notes(in changelog: String, from latest: String, to current: String) -> String {
-        var out: [Substring] = []
-        var inside = false
-        for line in changelog.split(separator: "\n", omittingEmptySubsequences: false) {
-            if line.hasPrefix("## ") {
-                let v = line.dropFirst(3).split(separator: " ").first.map(String.init) ?? ""
-                if v == current || (!v.isEmpty && !isNewer(v, than: current)) { break }
-                if v == latest || isNewer(latest, than: v) { inside = true }
-            }
-            if inside { out.append(line) }
-        }
-        return out.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

@@ -17,29 +17,37 @@ Focus Guard is a macOS menu bar app that helps you build study habits with Pomod
 ## Requirements
 
 - macOS 14 Sonoma or later, on Apple Silicon or Intel.
-- Xcode Command Line Tools, used to build the app from source. The install command below installs them if needed.
 - A supported browser: Google Chrome, Safari, Arc, Brave, or Microsoft Edge. Firefox is not supported.
 
 ## Install
 
-Copy this line (use the copy button on the right), paste it into **Terminal**, and press Return:
+### Option 1: Download (recommended)
+
+1. Download **FocusGuard.zip** from the [latest release](https://github.com/brightree/focus-guard/releases/latest).
+2. Open the zip if it isn't unzipped already, and drag **FocusGuard.app** into your **Applications** folder.
+3. Open it. Because the app isn't signed by Apple, macOS blocks it the first time:
+   - **macOS 15 or later:** click **Done**, then go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to Focus Guard.
+   - **macOS 14:** Control-click the app, choose **Open**, then click **Open** again.
+
+   Or run this once in Terminal instead:
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/FocusGuard.app
+   ```
+
+Focus Guard appears as a 🍅 in the menu bar. It shows up in the Dock and ⌘Tab only while one of its windows is open.
+
+### Option 2: Build from source
+
+Requires Xcode Command Line Tools. Copy this line, paste it into **Terminal**, and press Return:
 
 ```bash
 if ! xcode-select -p >/dev/null 2>&1; then xcode-select --install; echo "👉 Finish the installer that just opened, then paste this command again."; else cd ~ && ( [ -d focus-guard ] || git clone -q https://github.com/brightree/focus-guard.git ) && cd focus-guard && git pull -q && cd app && ./build.sh && { pgrep -x FocusGuard >/dev/null && osascript -e 'tell application id "local.focusguard.app" to quit' && sleep 2; open FocusGuard.app; }; fi
 ```
 
 - If Xcode Command Line Tools aren't installed yet, an installer opens. When it finishes, paste the same command again.
-- The app is downloaded to `~/focus-guard`, built for your Mac, and opened.
-- Focus Guard appears as a 🍅 in the menu bar. It shows up in the Dock and ⌘Tab only while one of its windows is open.
-
-To build by hand instead:
-
-```bash
-git clone https://github.com/brightree/focus-guard.git
-cd focus-guard/app
-./build.sh
-open FocusGuard.app
-```
+- The source is downloaded to `~/focus-guard`, built for your Mac, and opened.
+- If the build fails with errors about `Foundation` or the SDK, update or reinstall Command Line Tools (`sudo rm -rf /Library/Developer/CommandLineTools && xcode-select --install`), or use Option 1.
 
 ### Permissions
 
@@ -53,7 +61,12 @@ If you deny browser automation, the menu bar panel shows a warning with a shortc
 
 ## Updating
 
-The app checks for a new version once a day. When one is available, you get a notification and an **Update** button in the menu bar panel and at the bottom of the main window. The update window lists what changed; **Update Now** runs `git pull` and `build.sh` in the folder the app was built from, then relaunches the new build. If the update fails, the current version keeps running. This only works for copies built from a git clone, as the install command does.
+The app checks GitHub for a new release once a day. When one is available, you get a notification and an **Update** button in the menu bar panel and at the bottom of the main window. The update window lists what changed; **Update Now** installs it and relaunches the app. If the update fails, the current version keeps running.
+
+- **Downloaded app:** the new FocusGuard.zip is downloaded and replaces the app in place.
+- **Built from source:** the app runs `git pull` and `build.sh` in its folder.
+
+Because each release is a new unsigned build, macOS may ask for browser automation permission again after an update.
 
 On version 1.1.1 or earlier, update once from Terminal:
 
@@ -118,7 +131,7 @@ There is no conflict resolution for multiple Macs sharing one folder. A later sa
 
 ### Network and system changes
 
-Focus Guard has no analytics or tracking. Its only outbound request is the daily update check, which downloads `app/VERSION` (and, when a new version exists, `CHANGELOG.md`) from `raw.githubusercontent.com`; nothing about you or your usage is sent. Updates are installed only when you click **Update now**, and they build and run whatever is on the repository's `main` branch. **If you choose a folder synced by a cloud service (for example, Google Drive or iCloud Drive), that service uploads your records.**
+Focus Guard has no analytics or tracking. Its only outbound requests are the daily update check, which reads the latest release's version and notes from `api.github.com`, and, when you click **Update Now**, downloading that release (or, for source builds, `git pull`). Nothing about you or your usage is sent. **If you choose a folder synced by a cloud service (for example, Google Drive or iCloud Drive), that service uploads your records.**
 
 The app does not require administrator privileges or change `/etc/hosts`, network settings, or other system files.
 
@@ -132,7 +145,7 @@ Browser scripts run synchronously on the main thread with a two-second timeout p
 
 Focus Guard is a self-management aid. Quitting or force-quitting the app, denying automation permission, or using an unsupported browser bypasses blocking.
 
-Builds are ad-hoc signed, without a Developer ID signature or notarization. macOS may ask for automation permission again after a rebuild, and Gatekeeper may prevent a copied build from opening on another Mac. Building from source on each Mac avoids distributing a prebuilt app.
+Builds are ad-hoc signed, without a Developer ID signature or notarization, so Gatekeeper blocks the downloaded app until you allow it once (see Install). macOS may ask for automation permission again after an update or rebuild.
 
 ## Uninstall
 
@@ -152,6 +165,7 @@ To uninstall by hand:
 app/
   VERSION                  App version (shown in Settings)
   build.sh                 Builds the app with swiftc; no Xcode project required
+  release.sh               Builds a universal app and publishes it as a GitHub release
   MakeIcon.swift           Draws the 🍅 app icon at build time
   Sources/
     main.swift             Menu bar, windows, global shortcut, and app startup
