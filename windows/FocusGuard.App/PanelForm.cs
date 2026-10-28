@@ -173,6 +173,11 @@ sealed class PanelForm : AppWindow
                 todos.Controls.Add(cb);
             }
         }
+        // 6개를 넘으면 그 부분만 스크롤
+        var many = list.Count > 6;
+        todos.AutoSize = !many;
+        todos.AutoScroll = many;
+        if (many) todos.Size = new Size(W - 32, 260);
         todos.ResumeLayout();
     }
 }

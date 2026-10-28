@@ -132,7 +132,8 @@ struct PopoverView: View {
                 Divider()
                 Text(L("오늘 할 일", "Today's to-dos") + "  \(todos.filter(\.done).count)/\(todos.count)")
                     .font(.caption.bold()).foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 6) {
+                // 6개를 넘으면 그 부분만 스크롤
+                let list = VStack(alignment: .leading, spacing: 6) {
                     ForEach(todos.filter { !$0.done } + todos.filter(\.done)) { item in
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) { store.toggleTodo(item.id, on: dayKey()) }
@@ -149,6 +150,11 @@ struct PopoverView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                }
+                if todos.count > 6 {
+                    ScrollView { list.frame(maxWidth: .infinity, alignment: .leading) }.frame(height: 200)
+                } else {
+                    list
                 }
             }
         }
@@ -1120,6 +1126,7 @@ struct SettingsView: View {
     @State private var loginOn = SMAppService.mainApp.status == .enabled
 
     var body: some View {
+        ScrollView { // 내용이 화면보다 길면 스크롤
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("언어 / Language").font(.headline)
@@ -1214,6 +1221,9 @@ struct SettingsView: View {
         }
         .padding(20)
         .frame(width: 480)
+        }
+        .frame(width: 500)
+        .frame(minHeight: 360, idealHeight: 680)
         .onAppear(perform: load)
     }
 

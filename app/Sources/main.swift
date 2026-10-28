@@ -244,7 +244,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
     }
 
     func showSettings() {
-        Windows.shared.show("settings", title: L("Focus Guard 설정", "Focus Guard Settings")) {
+        Windows.shared.show("settings", title: L("Focus Guard 설정", "Focus Guard Settings"), resizable: true) {
             SettingsView(chooseFolder: { [weak self] in self?.chooseFolder() },
                          revealFolder: { [weak self] in self?.revealFolder() },
                          toggleLogin: { [weak self] in self?.toggleLogin() },
