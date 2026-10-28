@@ -31,7 +31,7 @@ public static class PhaseInfo
 
 public sealed class Settings
 {
-    public static readonly (int Min, int Max) FocusRange = (1, 180), WrapRange = (1, 30), BreakRange = (1, 60), WarnRange = (1, 120);
+    public static readonly (int Min, int Max) FocusRange = (1, 180), WrapRange = (0, 30), BreakRange = (0, 60), WarnRange = (1, 120);
 
     public int FocusMin { get; set; } = 35;
     public int WrapMin { get; set; } = 3;
@@ -47,6 +47,17 @@ public sealed class Settings
     public bool MorningPlan { get; set; } = true;
 
     public static string DefaultStopPhrase(Lang lang) => lang == Lang.En ? "Gotta work to graduate" : "일해야 졸업하지";
+
+    /// "집중 35분 → 정리 3분 → 휴식 7분 · …차단돼요" (0분인 단계는 뺀다)
+    public string CycleText()
+    {
+        var parts = new List<string> { I18n.L($"집중 {FocusMin}분", $"Focus {FocusMin} min") };
+        if (WrapMin > 0) parts.Add(I18n.L($"정리 {WrapMin}분", $"wrap up {WrapMin} min"));
+        if (BreakMin > 0) parts.Add(I18n.L($"휴식 {BreakMin}분", $"break {BreakMin} min"));
+        var blocked = WrapMin > 0 ? I18n.L("집중·정리 중에는 사이트가 차단돼요", "Sites are blocked during focus and wrap-up")
+                                  : I18n.L("집중 중에는 사이트가 차단돼요", "Sites are blocked during focus");
+        return string.Join(" → ", parts) + " · " + blocked;
+    }
 
     /// 모든 숫자 설정을 허용 범위 안으로 (화면 입력, 저장, 파일 읽기 모두 여기를 거친다)
     public Settings Clamped()

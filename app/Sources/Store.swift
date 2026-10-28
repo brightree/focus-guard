@@ -141,23 +141,38 @@ final class Store: ObservableObject {
                 d.timer.lastLogDay = k
                 d.timer.lastLogID = entry.id
             }
-            enter(.wrap, minutes: settings.wrapMin)
-            notify(L("🍅 집중 완료! 정리 \(settings.wrapMin)분", "🍅 Focus done! \(settings.wrapMin)-minute wrap-up"), L("어디까지 했는지, 다음에 뭘 할지 적고 나중에 할 것을 훑어보세요.", "Note where you left off and what's next, then skim your Later list."))
-        case .wrap:
-            enter(.rest, minutes: settings.breakMin)
-            notify(L("☕ 휴식 \(settings.breakMin)분", "☕ \(settings.breakMin)-minute break"), L("화면에서 눈을 떼고 일어나 보세요.", "Step away from the screen and stretch."))
-        case .rest:
-            let old = phase
-            mutate { d in
-                d.timer.phase = .idle
-                d.timer.endTime = nil
-                d.timer.pausedRemaining = nil
+            if settings.wrapMin > 0 {
+                enter(.wrap, minutes: settings.wrapMin)
+                notify(L("🍅 집중 완료! 정리 \(settings.wrapMin)분", "🍅 Focus done! \(settings.wrapMin)-minute wrap-up"), L("어디까지 했는지, 다음에 뭘 할지 적고 나중에 할 것을 훑어보세요.", "Note where you left off and what's next, then skim your Later list."))
+            } else {
+                startBreak()
             }
-            notify(L("휴식 끝", "Break's over"), L("다음 뽀모도로를 시작할 시간이에요. 딱 \(settings.focusMin)분만!", "Time for the next Pomodoro. Just \(settings.focusMin) minutes!"))
-            onPhaseChange?(old, .idle)
+        case .wrap:
+            startBreak()
+        case .rest:
+            endCycle()
         case .idle:
             break
         }
+    }
+
+    /// 정리 · 휴식이 0분이면 그 단계는 건너뛴다
+    private func startBreak() {
+        guard settings.breakMin > 0 else { endCycle(); return }
+        enter(.rest, minutes: settings.breakMin)
+        notify(L("☕ 휴식 \(settings.breakMin)분", "☕ \(settings.breakMin)-minute break"), L("화면에서 눈을 떼고 일어나 보세요.", "Step away from the screen and stretch."))
+    }
+
+    private func endCycle() {
+        let title = settings.breakMin > 0 ? L("휴식 끝", "Break's over")
+            : settings.wrapMin > 0 ? L("정리 끝", "Wrap-up over") : L("🍅 집중 완료!", "🍅 Focus done!")
+        mutate { d in
+            d.timer.phase = .idle
+            d.timer.endTime = nil
+            d.timer.pausedRemaining = nil
+        }
+        notify(title, L("다음 뽀모도로를 시작할 시간이에요. 딱 \(settings.focusMin)분만!", "Time for the next Pomodoro. Just \(settings.focusMin) minutes!"))
+        onPhaseChange?(.rest, .idle) // 한 바퀴가 끝났다 (휴식이 0분이어도) → 다음 집중 창
     }
 
     func finishWrap() {

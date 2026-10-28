@@ -52,8 +52,7 @@ sealed class StartForm : SmallWindow
         question.Text = L($"이번 {s.FocusMin}분 동안 무엇을 할까요?", $"What will you work on for the next {s.FocusMin} minutes?");
         lastNote.Text = Store.LastNote.Length > 0 ? L("지난 정리 메모: ", "Last wrap-up note: ") + Store.LastNote : "";
         lastNote.Visible = lastNote.Text.Length > 0;
-        info.Text = L($"집중 {s.FocusMin}분 → 정리 {s.WrapMin}분 → 휴식 {s.BreakMin}분 · 집중·정리 중에는 사이트가 차단돼요",
-                      $"Focus {s.FocusMin} min → wrap up {s.WrapMin} min → break {s.BreakMin} min · Sites are blocked during focus and wrap-up");
+        info.Text = s.CycleText();
         if (!dataChanged) return;
         picks.SuspendLayout();
         picks.Controls.Clear();

@@ -264,7 +264,7 @@ struct StartView: View {
                     }
                 }
             }
-            Text(L("집중 \(s.focusMin)분 → 정리 \(s.wrapMin)분 → 휴식 \(s.breakMin)분 · 집중·정리 중에는 사이트가 차단돼요", "Focus \(s.focusMin) min → wrap up \(s.wrapMin) min → break \(s.breakMin) min · Sites are blocked during focus and wrap-up"))
+            Text(s.cycleText)
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Spacer()

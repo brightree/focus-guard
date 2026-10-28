@@ -71,9 +71,19 @@ struct Settings: Codable, Equatable {
 
     static func defaultStopPhrase(_ lang: Lang) -> String { lang == .en ? "Gotta work to graduate" : "일해야 졸업하지" }
 
+    /// "집중 35분 → 정리 3분 → 휴식 7분 · …차단돼요" (0분인 단계는 뺀다)
+    var cycleText: String {
+        var parts = [L("집중 \(focusMin)분", "Focus \(focusMin) min")]
+        if wrapMin > 0 { parts.append(L("정리 \(wrapMin)분", "wrap up \(wrapMin) min")) }
+        if breakMin > 0 { parts.append(L("휴식 \(breakMin)분", "break \(breakMin) min")) }
+        let blocked = wrapMin > 0 ? L("집중·정리 중에는 사이트가 차단돼요", "Sites are blocked during focus and wrap-up")
+            : L("집중 중에는 사이트가 차단돼요", "Sites are blocked during focus")
+        return parts.joined(separator: " → ") + " · " + blocked
+    }
+
     static let focusRange = 1...180
-    static let wrapRange = 1...30
-    static let breakRange = 1...60
+    static let wrapRange = 0...30
+    static let breakRange = 0...60
     static let warnRange = 1...120
 
     /// 모든 숫자 설정을 허용 범위 안으로 맞춘다 (화면 입력, 저장, 파일 읽기 모두 여기를 거친다)

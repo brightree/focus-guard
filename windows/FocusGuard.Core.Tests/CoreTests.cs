@@ -73,8 +73,8 @@ public class ModelTests
     {
         var d = Json.Read("""{ "settings": { "focusMin": 100000, "wrapMin": -3, "breakMin": 0, "warnAfterMin": 999 } }""");
         Assert.Equal(180, d.Settings.FocusMin);
-        Assert.Equal(1, d.Settings.WrapMin);
-        Assert.Equal(1, d.Settings.BreakMin);
+        Assert.Equal(0, d.Settings.WrapMin);
+        Assert.Equal(0, d.Settings.BreakMin);
         Assert.Equal(120, d.Settings.WarnAfterMin);
     }
 }
@@ -142,6 +142,28 @@ public class TimerTests
         h.Advance(7 * 60);
         Assert.Equal(Phase.Idle, s.Phase);
         Assert.Equal(38 * 60, s.Today.FocusSec, 0); // 집중 35 + 정리 3
+    }
+
+    [Theory]
+    [InlineData(0, 7, Phase.Rest)]
+    [InlineData(3, 0, Phase.Wrap)]
+    [InlineData(0, 0, Phase.Idle)]
+    public void ZeroMinuteWrapOrBreakIsSkipped(int wrap, int rest, Phase afterFocus)
+    {
+        using var h = new Harness();
+        var s = h.Store;
+        var st = s.Settings; st.WrapMin = wrap; st.BreakMin = rest; s.UpdateSettings(st);
+        var changes = new List<(Phase, Phase)>();
+        s.PhaseChanged += (a, b) => changes.Add((a, b));
+        s.StartFocus("x");
+        h.Advance(35 * 60);
+        Assert.Equal(afterFocus, s.Phase);
+        Assert.Equal(1, s.Today.Sessions);
+        h.Advance(Math.Max(wrap, rest) * 60 + 1);
+        h.Advance(Math.Max(wrap, rest) * 60 + 1);
+        Assert.Equal(Phase.Idle, s.Phase);
+        Assert.Equal((Phase.Rest, Phase.Idle), changes.Last()); // 다음 집중 창이 뜬다
+        Assert.DoesNotContain(changes, c => (c.Item2 == Phase.Wrap && wrap == 0) || (c.Item2 == Phase.Rest && rest == 0));
     }
 
     [Fact]

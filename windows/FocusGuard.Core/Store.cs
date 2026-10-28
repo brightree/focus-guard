@@ -158,23 +158,35 @@ public sealed class Store
                 var k = TodayKey;
                 UpdateDay(k, d => { d.Sessions += 1; d.Log.Add(entry); });
                 Mutate(d => { d.Timer.LastLogDay = k; d.Timer.LastLogID = entry.Id; });
-                Enter(Phase.Wrap, Settings.WrapMin);
-                Notify(I18n.L($"🍅 집중 완료! 정리 {Settings.WrapMin}분", $"🍅 Focus done! {Settings.WrapMin}-minute wrap-up"),
-                       I18n.L("어디까지 했는지, 다음에 뭘 할지 적고 나중에 할 것을 훑어보세요.", "Note where you left off and what's next, then skim your Later list."));
+                if (Settings.WrapMin > 0)
+                {
+                    Enter(Phase.Wrap, Settings.WrapMin);
+                    Notify(I18n.L($"🍅 집중 완료! 정리 {Settings.WrapMin}분", $"🍅 Focus done! {Settings.WrapMin}-minute wrap-up"),
+                           I18n.L("어디까지 했는지, 다음에 뭘 할지 적고 나중에 할 것을 훑어보세요.", "Note where you left off and what's next, then skim your Later list."));
+                }
+                else StartBreak();
                 break;
-            case Phase.Wrap:
-                Enter(Phase.Rest, Settings.BreakMin);
-                Notify(I18n.L($"☕ 휴식 {Settings.BreakMin}분", $"☕ {Settings.BreakMin}-minute break"),
-                       I18n.L("화면에서 눈을 떼고 일어나 보세요.", "Step away from the screen and stretch."));
-                break;
-            case Phase.Rest:
-                var old = Phase;
-                Mutate(d => { d.Timer.Phase = Phase.Idle; d.Timer.EndTime = null; d.Timer.PausedRemaining = null; });
-                Notify(I18n.L("휴식 끝", "Break's over"),
-                       I18n.L($"다음 뽀모도로를 시작할 시간이에요. 딱 {Settings.FocusMin}분만!", $"Time for the next Pomodoro. Just {Settings.FocusMin} minutes!"));
-                PhaseChanged?.Invoke(old, Phase.Idle);
-                break;
+            case Phase.Wrap: StartBreak(); break;
+            case Phase.Rest: EndCycle(); break;
         }
+    }
+
+    /// 정리 · 휴식이 0분이면 그 단계는 건너뛴다
+    void StartBreak()
+    {
+        if (Settings.BreakMin <= 0) { EndCycle(); return; }
+        Enter(Phase.Rest, Settings.BreakMin);
+        Notify(I18n.L($"☕ 휴식 {Settings.BreakMin}분", $"☕ {Settings.BreakMin}-minute break"),
+               I18n.L("화면에서 눈을 떼고 일어나 보세요.", "Step away from the screen and stretch."));
+    }
+
+    void EndCycle()
+    {
+        var title = Settings.BreakMin > 0 ? I18n.L("휴식 끝", "Break's over")
+                  : Settings.WrapMin > 0 ? I18n.L("정리 끝", "Wrap-up over") : I18n.L("🍅 집중 완료!", "🍅 Focus done!");
+        Mutate(d => { d.Timer.Phase = Phase.Idle; d.Timer.EndTime = null; d.Timer.PausedRemaining = null; });
+        Notify(title, I18n.L($"다음 뽀모도로를 시작할 시간이에요. 딱 {Settings.FocusMin}분만!", $"Time for the next Pomodoro. Just {Settings.FocusMin} minutes!"));
+        PhaseChanged?.Invoke(Phase.Rest, Phase.Idle); // 한 바퀴가 끝났다 (휴식이 0분이어도) → 다음 집중 창
     }
 
     public void FinishWrap() { if (Phase == Phase.Wrap) PhaseEnded(); }
