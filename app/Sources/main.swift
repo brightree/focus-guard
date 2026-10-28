@@ -131,42 +131,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
 
     func renderTitle() {
         guard let b = item.button else { return }
-        let mins = "\(Int((store.remaining / 60).rounded(.up)))"
-        let tomato = store.phase == .idle || (store.phase == .focus && !store.isPaused)
-        let title = store.phase == .idle ? "" : tomato ? " " + mins : "\(store.isPaused ? "⏸" : store.phase.icon) \(mins)"
-        guard title != lastTitle || (b.image != nil) != tomato else { return }
+        let title = store.phase == .idle
+            ? "🍅"
+            : "\(store.isPaused ? "⏸" : store.phase.icon) \(Int((store.remaining / 60).rounded(.up)))"
+        guard title != lastTitle else { return }
         lastTitle = title
-        b.image = tomato ? Self.blueTomato : nil
-        b.imagePosition = .imageLeft
         b.title = title
         b.toolTip = store.timer.task.isEmpty ? "Focus Guard" : "📌 \(store.timer.task)"
     }
-
-    /// 메뉴 막대의 파란 토마토: 🍅 이모지의 빨간 부분만 파란색으로 바꾼다 (꼭지는 초록 그대로)
-    static let blueTomato: NSImage = {
-        let pt: CGFloat = 16, px = 32
-        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px, bitsPerSample: 8,
-                                   samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-                                   colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-        let s = NSAttributedString(string: "🍅", attributes: [.font: NSFont.systemFont(ofSize: CGFloat(px) * 0.8)])
-        let size = s.size()
-        s.draw(at: NSPoint(x: (CGFloat(px) - size.width) / 2, y: (CGFloat(px) - size.height) / 2))
-        NSGraphicsContext.restoreGraphicsState()
-        for y in 0..<px {
-            for x in 0..<px {
-                guard let c = rep.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB), c.alphaComponent > 0 else { continue }
-                let h = c.hueComponent
-                guard (h < 0.1 || h > 0.9), c.saturationComponent > 0.25 else { continue }
-                rep.setColor(NSColor(deviceHue: 0.6, saturation: c.saturationComponent, brightness: c.brightnessComponent,
-                                     alpha: c.alphaComponent), atX: x, y: y)
-            }
-        }
-        let img = NSImage(size: NSSize(width: pt, height: pt))
-        img.addRepresentation(rep)
-        return img
-    }()
 
     // MARK: 메뉴 막대 패널
 
