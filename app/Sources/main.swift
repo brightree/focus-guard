@@ -14,22 +14,35 @@ final class Windows: NSObject, NSWindowDelegate {
     static let shared = Windows()
     private var windows: [String: NSWindow] = [:]
 
+    /// height: 처음 열 때의 높이 (스크롤되는 긴 창용). 주면 그 뒤로는 사용자가 크기를 조절할 수 있다.
     func show<V: View>(_ id: String, title: String, floating: Bool = false, resizable: Bool = false,
-                       @ViewBuilder content: () -> V) {
+                       height: CGFloat? = nil, @ViewBuilder content: () -> V) {
         let root = content().environmentObject(Store.shared)
         let w: NSWindow
+        let wasVisible = windows[id]?.isVisible == true
+        func host() -> NSViewController {
+            let h = NSHostingController(rootView: root)
+            if height != nil { h.sizingOptions = [.minSize] } // 내용 크기에 창을 맞추지 않는다 (스크롤)
+            return h
+        }
         if let existing = windows[id] {
             w = existing
-            w.contentViewController = NSHostingController(rootView: root)
+            w.contentViewController = host()
         } else {
             var style: NSWindow.StyleMask = [.titled, .closable]
             if resizable { style.insert(.resizable) }
             w = NSWindow(contentRect: .zero, styleMask: style, backing: .buffered, defer: false)
             w.isReleasedWhenClosed = false
             w.delegate = self
-            w.contentViewController = NSHostingController(rootView: root)
-            w.center()
+            w.contentViewController = host()
             windows[id] = w
+        }
+        if let height, !wasVisible {
+            let screen = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame.height ?? 800
+            w.setContentSize(NSSize(width: w.frame.width, height: min(height, screen * 0.85)))
+            w.center()
+        } else if !wasVisible, windows[id] === w, w.frame.origin == .zero {
+            w.center()
         }
         w.title = title
         w.level = floating ? .floating : .normal
@@ -244,7 +257,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
     }
 
     func showSettings() {
-        Windows.shared.show("settings", title: L("Focus Guard 설정", "Focus Guard Settings"), resizable: true) {
+        Windows.shared.show("settings", title: L("Focus Guard 설정", "Focus Guard Settings"), resizable: true, height: 760) {
             SettingsView(chooseFolder: { [weak self] in self?.chooseFolder() },
                          revealFolder: { [weak self] in self?.revealFolder() },
                          toggleLogin: { [weak self] in self?.toggleLogin() },
