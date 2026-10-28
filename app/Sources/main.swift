@@ -114,6 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
         watcher.onWarn = { [weak self] min, site, bid in self?.showWarning(min: min, site: site, bid: bid) }
         store.onSecond = { [weak self] in self?.watcher.tick() }
         Updater.shared.start()
+        RemindersSync.shared.start(store)
         if store.isBlocking { watcher.sweepAllTabs() }
         renderTitle()
     }

@@ -41,6 +41,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
+  <key>NSRemindersFullAccessUsageDescription</key><string>설정에서 아이폰·아이패드 동기화를 켜면, 할 일과 나중에 할 것을 미리 알림 목록에 넣고 체크한 내용을 가져와요.</string>
+  <key>NSRemindersUsageDescription</key><string>설정에서 아이폰·아이패드 동기화를 켜면, 할 일과 나중에 할 것을 미리 알림 목록에 넣고 체크한 내용을 가져와요.</string>
   <key>NSAppleEventsUsageDescription</key><string>집중 시간에 분산 사이트 탭을 차단 페이지로 바꾸고, 딴짓 시간을 기록하려고 브라우저의 현재 탭 주소를 확인해요.</string>
 </dict>
 </plist>

@@ -314,10 +314,13 @@ final class Store: ObservableObject {
 
     func todos(on day: String) -> [TodoItem] { data.days[day]?.todos ?? [] }
 
-    func addTodo(_ text: String, kind: TodoKind, on day: String) {
+    @discardableResult
+    func addTodo(_ text: String, kind: TodoKind, on day: String, done: Bool = false) -> UUID? {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return }
-        updateDay(day) { $0.todos.append(TodoItem(text: t, kind: kind)) }
+        guard !t.isEmpty else { return nil }
+        let item = TodoItem(text: t, kind: kind, done: done)
+        updateDay(day) { $0.todos.append(item) }
+        return item.id
     }
 
     func toggleTodo(_ id: UUID, on day: String) {
@@ -335,6 +338,48 @@ final class Store: ObservableObject {
     }
 
     func deleteTodo(_ id: UUID, on day: String) { updateDay(day) { $0.todos.removeAll { $0.id == id } } }
+
+    // MARK: - 미리 알림에서 바뀐 내용 반영 (RemindersSync)
+
+    /// 글 · 종류 · 완료 · 날짜를 한 번에 맞춘다 (날짜가 바뀌면 그 날로 옮긴다)
+    func applySyncedTodo(_ id: UUID, text: String, kind: TodoKind, done: Bool, day: String) {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, let from = data.days.first(where: { $0.value.todos.contains { $0.id == id } })?.key else { return }
+        mutate { d in
+            guard var item = d.days[from]?.todos.first(where: { $0.id == id }) else { return }
+            item.text = t
+            item.kind = kind
+            item.done = done
+            if from == day {
+                if let i = d.days[from]?.todos.firstIndex(where: { $0.id == id }) { d.days[from]?.todos[i] = item }
+            } else {
+                d.days[from]?.todos.removeAll { $0.id == id }
+                d.days[day, default: DayStats()].todos.append(item)
+            }
+        }
+    }
+
+    func deleteTodo(_ id: UUID) {
+        guard let day = data.days.first(where: { $0.value.todos.contains { $0.id == id } })?.key else { return }
+        deleteTodo(id, on: day)
+    }
+
+    /// 폰에서 적은 나중에 할 것
+    func addSyncedLater(_ text: String, done: Bool) -> UUID? {
+        let t = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(500))
+        guard !t.isEmpty, canPersist else { return nil }
+        let item = LaterItem(text: t, created: Date(), during: "", done: done)
+        mutate { $0.later.append(item) }
+        return item.id
+    }
+
+    func applySyncedLater(_ id: UUID, text: String, done: Bool) {
+        let t = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(500))
+        guard !t.isEmpty else { return }
+        mutate { d in
+            if let i = d.later.firstIndex(where: { $0.id == id }) { d.later[i].text = t; d.later[i].done = done }
+        }
+    }
 
     /// 그 날 이전에 할 일을 적었던 가장 가까운 날의 못 한 일
     func unfinished(before day: String) -> [TodoItem] {
