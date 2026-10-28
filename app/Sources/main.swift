@@ -13,6 +13,16 @@ import UserNotifications
 final class Windows: NSObject, NSWindowDelegate {
     static let shared = Windows()
     private var windows: [String: NSWindow] = [:]
+    private var lastOtherApp: NSRunningApplication? // 창을 다 닫으면 이 앱으로 돌아간다
+
+    override init() {
+        super.init()
+        if let front = NSWorkspace.shared.frontmostApplication, front != .current { lastOtherApp = front }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication, app != .current else { return }
+            self?.lastOtherApp = app
+        }
+    }
 
     /// height: 처음 열 때의 높이 (스크롤되는 긴 창용). 주면 그 뒤로는 사용자가 크기를 조절할 수 있다.
     func show<V: View>(_ id: String, title: String, floating: Bool = false, resizable: Bool = false,
@@ -60,6 +70,8 @@ final class Windows: NSObject, NSWindowDelegate {
         closing?.contentViewController = nil
         if !windows.values.contains(where: { $0 !== closing && $0.isVisible }) {
             NSApp.setActivationPolicy(.accessory)
+            // 맥이 뒤에 있던 아무 앱(시스템 설정 등)을 앞으로 가져오지 않게, 쓰던 앱으로 돌아간다
+            if let app = lastOtherApp, !app.isTerminated { app.activate() }
         }
     }
 }
@@ -115,6 +127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNU
         store.onSecond = { [weak self] in self?.watcher.tick() }
         Updater.shared.start()
         RemindersSync.shared.start(store)
+        _ = Windows.shared // 쓰던 앱을 지금부터 기억한다
         if store.isBlocking { watcher.sweepAllTabs() }
         renderTitle()
     }
