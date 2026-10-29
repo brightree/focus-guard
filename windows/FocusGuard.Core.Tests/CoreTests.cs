@@ -223,6 +223,20 @@ public class TimerTests
 public class TodoTests
 {
     [Fact]
+    public void DragReordersTodos()
+    {
+        using var h = new Harness();
+        var s = h.Store;
+        var k = s.TodayKey;
+        foreach (var t in new[] { "a", "b", "c" }) s.AddTodo(t, TodoKind.Must, k);
+        Guid id(string t) => s.TodosOn(k).Single(x => x.Text == t).Id;
+        s.MoveTodo(id("a"), id("c"), k); // 아래로 → c 뒤
+        Assert.Equal(new[] { "b", "c", "a" }, s.TodosOn(k).Select(x => x.Text));
+        s.MoveTodo(id("a"), id("b"), k); // 위로 → b 앞
+        Assert.Equal(new[] { "a", "b", "c" }, s.TodosOn(k).Select(x => x.Text));
+    }
+
+    [Fact]
     public void TodosLiveOnTheirOwnDay()
     {
         using var h = new Harness();

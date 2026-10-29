@@ -337,6 +337,15 @@ final class Store: ObservableObject {
         }
     }
 
+    /// 끌어서 순서 바꾸기: id 를 target 자리로 (아래로 끌면 target 뒤, 위로 끌면 앞)
+    func moveTodo(_ id: UUID, to target: UUID, on day: String) {
+        guard id != target else { return }
+        updateDay(day) { d in
+            guard let from = d.todos.firstIndex(where: { $0.id == id }), let to = d.todos.firstIndex(where: { $0.id == target }) else { return }
+            d.todos.insert(d.todos.remove(at: from), at: to)
+        }
+    }
+
     func deleteTodo(_ id: UUID, on day: String) { updateDay(day) { $0.todos.removeAll { $0.id == id } } }
 
     // MARK: - 미리 알림에서 바뀐 내용 반영 (RemindersSync)

@@ -420,6 +420,7 @@ struct TodoSection: View {
     let day: String
     let items: [TodoItem]
     @State private var draft = ""
+    @State private var dragging: UUID?
 
     var body: some View {
         // 끝낸 일은 아래로
@@ -436,9 +437,19 @@ struct TodoSection: View {
             }
             .padding(.bottom, 8)
 
+            // 끌어서 순서 바꾸기 (같은 칸 · 끝낸 일은 끝낸 일끼리)
             ForEach(sorted) { item in
-                TodoRow(item: item, day: day, color: kind.color)
-                Divider().opacity(0.5)
+                VStack(spacing: 0) {
+                    TodoRow(item: item, day: day, color: kind.color)
+                    Divider().opacity(0.5)
+                }
+                .onDrag {
+                    dragging = item.id
+                    return NSItemProvider(object: item.id.uuidString as NSString)
+                }
+                .onDrop(of: [.text], delegate: TodoDrop(target: item.id, group: sorted.filter { $0.done == item.done }.map(\.id), dragging: $dragging) { from, to in
+                    withAnimation(.easeInOut(duration: 0.15)) { store.moveTodo(from, to: to, on: day) }
+                })
             }
 
             HStack(spacing: 10) {
@@ -457,6 +468,24 @@ struct TodoSection: View {
         .overlay(alignment: .leading) {
             RoundedRectangle(cornerRadius: 2).fill(kind.color).frame(width: 4).padding(.vertical, 14)
         }
+    }
+}
+
+/// 다른 줄 위로 끌고 가면 그 자리로 옮긴다 (놓기 전에도 바로 보이게)
+struct TodoDrop: DropDelegate {
+    let target: UUID
+    let group: [UUID]
+    @Binding var dragging: UUID?
+    let move: (UUID, UUID) -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let d = dragging, d != target, group.contains(d) else { return }
+        move(d, target)
+    }
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+    func performDrop(info: DropInfo) -> Bool {
+        dragging = nil
+        return true
     }
 }
 

@@ -2,7 +2,7 @@ using FocusGuard.Core;
 
 namespace FocusGuard.App;
 
-/// 할 일 창: ◀ 날짜 ▶ 이동, 반드시 / 하면 좋은 일 / 기타, 바로 체크 · 더블 클릭 수정 · 삭제, 지난번 못 한 일 가져오기
+/// 할 일 창: ◀ 날짜 ▶ 이동, 반드시 / 하면 좋은 일 / 기타, 바로 체크 · 더블 클릭 수정 · 삭제 · 끌어서 순서 바꾸기, 지난번 못 한 일 가져오기
 sealed class PlanForm : AppWindow
 {
     const int W = 460;
@@ -108,7 +108,7 @@ sealed class PlanForm : AppWindow
             rows.SuspendLayout();
             rows.Controls.Clear();
             foreach (var item in items.Where(t => !t.Done).Concat(items.Where(t => t.Done))) // 끝낸 일은 아래로
-                rows.Controls.Add(new TodoRow(Store, item, day, W - 24, () => editing = true, () => { editing = false; RefreshView(true); }));
+                rows.Controls.Add(new TodoRow(Store, item, day, W - 24, () => editing = true, () => { editing = false; RefreshView(true); }, reorder: true));
             rows.ResumeLayout();
         }
     }

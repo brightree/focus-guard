@@ -144,9 +144,12 @@ abstract class AppWindow : Form
 }
 
 /// 할 일 한 줄: 동그라미 눌러 체크, 글자 더블 클릭해서 고치기 (Enter 저장 · Esc 취소), 마우스를 올리면 삭제 버튼
+/// reorder 를 주면 글자를 끌어서 다른 줄 위에 놓아 순서를 바꾼다 (같은 칸 · 끝낸 일은 끝낸 일끼리)
 sealed class TodoRow : FlowLayoutPanel
 {
-    public TodoRow(Store store, TodoItem item, string day, int width, Action onEditStart, Action onEditEnd)
+    const string DragPrefix = "focusguard-todo:";
+
+    public TodoRow(Store store, TodoItem item, string day, int width, Action onEditStart, Action onEditEnd, bool reorder = false)
     {
         FlowDirection = FlowDirection.LeftToRight;
         WrapContents = false;
@@ -201,5 +204,35 @@ sealed class TodoRow : FlowLayoutPanel
         Controls.Add(check);
         Controls.Add(text);
         Controls.Add(del);
+        if (reorder) EnableReorder(store, item, day, text);
+    }
+
+    void EnableReorder(Store store, TodoItem item, string day, Control handle)
+    {
+        Point? down = null;
+        handle.Cursor = Cursors.SizeAll;
+        handle.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) down = Cursor.Position; };
+        handle.MouseUp += (_, _) => down = null;
+        handle.MouseMove += (_, e) =>
+        {
+            if (down is not Point p || e.Button != MouseButtons.Left) return;
+            var min = SystemInformation.DragSize;
+            if (Math.Abs(Cursor.Position.X - p.X) < min.Width && Math.Abs(Cursor.Position.Y - p.Y) < min.Height) return;
+            down = null;
+            DoDragDrop(DragPrefix + item.Id, DragDropEffects.Move);
+        };
+        TodoItem? dragged(DragEventArgs e)
+        {
+            var s = e.Data?.GetData(DataFormats.UnicodeText) as string;
+            if (s == null || !s.StartsWith(DragPrefix) || !Guid.TryParse(s[DragPrefix.Length..], out var id) || id == item.Id) return null;
+            var d = store.TodosOn(day).FirstOrDefault(t => t.Id == id);
+            return d != null && d.Kind == item.Kind && d.Done == item.Done ? d : null;
+        }
+        foreach (Control c in new Control[] { this }.Concat(Controls.Cast<Control>()))
+        {
+            c.AllowDrop = true;
+            c.DragOver += (_, e) => e.Effect = dragged(e) != null ? DragDropEffects.Move : DragDropEffects.None;
+            c.DragDrop += (_, e) => { if (dragged(e) is TodoItem d) store.MoveTodo(d.Id, item.Id, day); };
+        }
     }
 }

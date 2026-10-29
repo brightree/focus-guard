@@ -323,6 +323,20 @@ public sealed class Store
         UpdateDay(day, d => { var x = d.Todos.FirstOrDefault(i => i.Id == id); if (x != null) x.Text = t; });
     }
 
+    /// 끌어서 순서 바꾸기: id 를 target 자리로 (아래로 끌면 target 뒤, 위로 끌면 앞)
+    public void MoveTodo(Guid id, Guid target, string day)
+    {
+        if (id == target) return;
+        UpdateDay(day, d =>
+        {
+            int from = d.Todos.FindIndex(i => i.Id == id), to = d.Todos.FindIndex(i => i.Id == target);
+            if (from < 0 || to < 0) return;
+            var item = d.Todos[from];
+            d.Todos.RemoveAt(from);
+            d.Todos.Insert(to, item);
+        });
+    }
+
     public void DeleteTodo(Guid id, string day) => UpdateDay(day, d => d.Todos.RemoveAll(i => i.Id == id));
 
     /// 그 날 이전에 할 일을 적었던 가장 가까운 날의 못 한 일
