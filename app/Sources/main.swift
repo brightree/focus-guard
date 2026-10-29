@@ -47,18 +47,28 @@ final class Windows: NSObject, NSWindowDelegate {
             w.contentViewController = host()
             windows[id] = w
         }
-        if let height, !wasVisible {
-            let screen = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame.height ?? 800
-            w.setContentSize(NSSize(width: w.frame.width, height: min(height, screen * 0.85)))
-            w.center()
-        } else if !wasVisible, windows[id] === w, w.frame.origin == .zero {
-            w.center()
+        if !wasVisible {
+            // 모니터가 여러 개면 지금 마우스가 있는 화면에 연다 (같은 화면이면 지난 자리 그대로)
+            let p = NSEvent.mouseLocation
+            let screen = NSScreen.screens.first { NSMouseInRect(p, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens.first
+            if let height {
+                w.setContentSize(NSSize(width: w.frame.width, height: min(height, (screen?.visibleFrame.height ?? 800) * 0.85)))
+                if let screen { center(w, on: screen) }
+            } else if let screen, w.frame.origin == .zero || w.screen != screen {
+                center(w, on: screen)
+            }
         }
         w.title = title
         w.level = floating ? .floating : .normal
         NSApp.setActivationPolicy(.regular) // 창이 있는 동안은 Dock 과 ⌘Tab 에 보인다
         NSApp.activate(ignoringOtherApps: true)
         w.makeKeyAndOrderFront(nil)
+    }
+
+    /// NSWindow.center() 처럼 가운데보다 조금 위에 둔다 (center() 는 화면을 고를 수 없다)
+    private func center(_ w: NSWindow, on screen: NSScreen) {
+        let v = screen.visibleFrame, s = w.frame.size
+        w.setFrameOrigin(NSPoint(x: (v.midX - s.width / 2).rounded(), y: (v.minY + (v.height - s.height) * 0.6).rounded()))
     }
 
     func close(_ id: String) { windows[id]?.close() }
