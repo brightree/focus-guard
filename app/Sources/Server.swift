@@ -5,6 +5,8 @@ import Network
 //   GET  /blocked         → 차단 페이지 (브라우저 감시가 분산 사이트 탭을 여기로 보낸다)
 //   GET  /status          → 현재 상태 (차단 여부, 남은 시간, 할 일) — 차단 페이지가 읽는다
 //   POST /later {text}    → 나중에 할 것 추가
+//   POST /todo {text, kind?, day?} → 할 일 추가. kind: must | nice | other (기본 must),
+//                           day: today | tomorrow | YYYY-MM-DD | week | next-week (기본 today, week = 이번 주 할 일)
 
 let SERVER_PORT: UInt16 = 47321
 private let maxBodyBytes = 64 * 1024
@@ -75,6 +77,20 @@ final class StateServer {
 
     private static func header(_ name: String, in lines: [Substring]) -> String? { headers(name, in: lines).first }
 
+    /// "today" · "tomorrow" · "YYYY-MM-DD" → 날짜 키, "week" · "next-week" → 그 주 할 일 키. 알 수 없는 값이면 nil.
+    static func parseDay(_ s: String) -> String? {
+        let cal = Calendar.current
+        switch s.lowercased() {
+        case "today": return dayKey()
+        case "tomorrow": return dayKey(cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: Date()))!)
+        case "week": return weekListKey(of: dayKey())
+        case "next-week": return weekListKey(of: dayKey(cal.date(byAdding: .day, value: 7, to: cal.startOfDay(for: Date()))!))
+        default:
+            guard let d = dayKeyFormatter.date(from: s), dayKeyFormatter.string(from: d) == s else { return nil }
+            return s
+        }
+    }
+
     /// 본문 길이. 없으면 0, 비었거나·숫자가 아니거나·음수거나·여러 개면 nil (잘못된 요청).
     private static func contentLength(_ lines: [Substring]) -> Int? {
         let values = headers("content-length", in: lines)
@@ -113,6 +129,20 @@ final class StateServer {
             } else {
                 store.addLater(text)
                 out = statusJSON()
+            }
+        } else if requestLine.hasPrefix("POST /todo") {
+            let text = (json["text"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let kind = TodoKind(rawValue: json["kind"] as? String ?? "must")
+            let day = Self.parseDay(json["day"] as? String ?? "today")
+            if text.isEmpty || kind == nil || day == nil {
+                status = "400 Bad Request"
+                out = ["error": "text is required; kind: must | nice | other; day: today | tomorrow | YYYY-MM-DD | week | next-week"]
+            } else if !store.canPersist {
+                status = "503 Service Unavailable"
+                out = ["error": store.saveError ?? L("기록을 저장할 수 없는 상태예요.", "Saving is unavailable right now.")]
+            } else {
+                let id = store.addTodo(text, kind: kind!, on: day!)
+                out = ["id": id?.uuidString ?? "", "day": day!, "kind": kind!.rawValue, "text": text]
             }
         } else {
             status = "404 Not Found"

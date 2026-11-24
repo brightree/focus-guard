@@ -12,7 +12,7 @@ For macOS only; see [Install](#install).
 - **Distraction reminders:** Outside focus and wrap-up, warns you after 10 minutes of tracked use on a listed site, then at further 10-minute intervals. Brief interruptions of up to 3 minutes can count toward the same streak.
 - **Timed free time:** When you need a break from work, right-click the 🍅 in the menu bar and pick 5, 10, 15, or 30 minutes. The same menu ends free time early. The menu bar counts down; distraction reminders pause until the time is up. Then you get a notification and the Start Focus window. If you keep going, the menu bar shows how far over you are (for example, `🎮 +3`) and you're reminded every 5 minutes.
 - **A "Later" list:** Capture a thought from the menu bar or press `⌥⇧L` from any app. Review your list during wrap-up.
-- **Daily planning:** Organize tasks into must-do, nice-to-do, and other tasks for today or any other day, then check them off as you go. The to-do window opens the first time you use your Mac after 6 a.m. each day, showing anything you planned ahead; you can turn this off in Settings.
+- **Daily planning:** Organize tasks into must-do, nice-to-do, and other tasks for today or any other day, then check them off as you go. A This Week list sits above the day's tasks for things to finish by Sunday. The to-do window opens the first time you use your Mac after 6 a.m. each day, showing anything you planned ahead; you can turn this off in Settings.
 - **Weekly history:** Review daily study time, completed sessions, wrap-up notes, and time spent on distracting sites. Sessions that cross midnight are split between the two days.
 - **Study stats:** By day or week, see study time, completed sessions, focus success rate, and the top five apps and websites you used while focusing, with their share and minutes.
 - **Friction before quitting:** Pausing during focus asks "Have you earned this break?" first, and giving up requires typing a confirmation phrase (configurable). Spacing and punctuation don't matter.
@@ -95,7 +95,7 @@ macOS grants broad browser automation permission. This app uses it to read tab U
 
 ### Local web server
 
-[Server.swift](app/Sources/Server.swift) serves the blocked page at `http://127.0.0.1:47321`. It binds to the IPv4 loopback address, so it is not directly accessible from other devices on your network.
+[Server.swift](app/Sources/Server.swift) serves the blocked page at `http://127.0.0.1:47321`. It also accepts `POST /later` and `POST /todo` (JSON `text`, optional `kind`: `must` | `nice` | `other`, optional `day`: `today` | `tomorrow` | `YYYY-MM-DD` | `week` | `next-week`), so scripts on your Mac can add items. It binds to the IPv4 loopback address, so it is not directly accessible from other devices on your network.
 
 The server requires the exact `Host` header `127.0.0.1:47321`. When an `Origin` header is present, it must match `http://127.0.0.1:47321`. These checks help restrict requests from other websites; they do not authenticate local applications. Malformed requests (missing, invalid, or duplicate `Content-Length`) are rejected, request bodies are limited to 64 KB, and connections are closed after 5 seconds.
 

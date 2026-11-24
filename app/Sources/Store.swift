@@ -384,41 +384,57 @@ final class Store: ObservableObject {
 
     // MARK: - 할 일 (오늘 또는 미리 적어두는 다른 날)
 
-    func todos(on day: String) -> [TodoItem] { data.days[day]?.todos ?? [] }
+    // day 자리에 weekListKey(of:) 를 넘기면 그 주 할 일 목록을 다룬다
+    func todos(on day: String) -> [TodoItem] {
+        day.hasPrefix(weekPrefix) ? data.weeks[String(day.dropFirst(weekPrefix.count))] ?? [] : data.days[day]?.todos ?? []
+    }
+
+    private func updateTodos(_ key: String, _ f: (inout [TodoItem]) -> Void) {
+        if key.hasPrefix(weekPrefix) {
+            let monday = String(key.dropFirst(weekPrefix.count))
+            mutate { d in
+                var list = d.weeks[monday] ?? []
+                f(&list)
+                d.weeks[monday] = list.isEmpty ? nil : list
+            }
+        } else {
+            updateDay(key) { f(&$0.todos) }
+        }
+    }
 
     @discardableResult
     func addTodo(_ text: String, kind: TodoKind, on day: String, done: Bool = false) -> UUID? {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return nil }
         let item = TodoItem(text: t, kind: kind, done: done)
-        updateDay(day) { $0.todos.append(item) }
+        updateTodos(day) { $0.append(item) }
         return item.id
     }
 
     func toggleTodo(_ id: UUID, on day: String) {
-        updateDay(day) { d in
-            if let i = d.todos.firstIndex(where: { $0.id == id }) { d.todos[i].done.toggle() }
+        updateTodos(day) { d in
+            if let i = d.firstIndex(where: { $0.id == id }) { d[i].done.toggle() }
         }
     }
 
     func renameTodo(_ id: UUID, to text: String, on day: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
-        updateDay(day) { d in
-            if let i = d.todos.firstIndex(where: { $0.id == id }) { d.todos[i].text = t }
+        updateTodos(day) { d in
+            if let i = d.firstIndex(where: { $0.id == id }) { d[i].text = t }
         }
     }
 
     /// 끌어서 순서 바꾸기: id 를 target 자리로 (아래로 끌면 target 뒤, 위로 끌면 앞)
     func moveTodo(_ id: UUID, to target: UUID, on day: String) {
         guard id != target else { return }
-        updateDay(day) { d in
-            guard let from = d.todos.firstIndex(where: { $0.id == id }), let to = d.todos.firstIndex(where: { $0.id == target }) else { return }
-            d.todos.insert(d.todos.remove(at: from), at: to)
+        updateTodos(day) { d in
+            guard let from = d.firstIndex(where: { $0.id == id }), let to = d.firstIndex(where: { $0.id == target }) else { return }
+            d.insert(d.remove(at: from), at: to)
         }
     }
 
-    func deleteTodo(_ id: UUID, on day: String) { updateDay(day) { $0.todos.removeAll { $0.id == id } } }
+    func deleteTodo(_ id: UUID, on day: String) { updateTodos(day) { $0.removeAll { $0.id == id } } }
 
     // MARK: - 미리 알림에서 바뀐 내용 반영 (RemindersSync)
 

@@ -191,6 +191,7 @@ struct DataFile: Codable {
     var timer = TimerState()
     var days: [String: DayStats] = [:]
     var later: [LaterItem] = []
+    var weeks: [String: [TodoItem]] = [:] // 이번 주 할 일. 키 = 그 주 월요일 "yyyy-MM-dd"
     var planShownDay = "" // 아침 계획 창을 마지막으로 자동으로 띄운 날
 
     init() {}
@@ -201,6 +202,7 @@ struct DataFile: Codable {
         timer = try c.decodeIfPresent(TimerState.self, forKey: .timer) ?? TimerState()
         days = try c.decodeIfPresent([String: DayStats].self, forKey: .days) ?? [:]
         later = try c.decodeIfPresent([LaterItem].self, forKey: .later) ?? []
+        weeks = try c.decodeIfPresent([String: [TodoItem]].self, forKey: .weeks) ?? [:]
         planShownDay = try c.decodeIfPresent(String.self, forKey: .planShownDay) ?? ""
     }
 }
@@ -216,6 +218,19 @@ let dayKeyFormatter: DateFormatter = {
 let madeBy = "Made by Anonymous, KAIST IS"
 
 func dayKey(_ d: Date = Date()) -> String { dayKeyFormatter.string(from: d) }
+
+/// 할 일 목록 키: 날짜 키("yyyy-MM-dd")는 그날 할 일, "week:<월요일>"은 그 주 할 일
+let weekPrefix = "week:"
+
+/// 그 날이 들어 있는 주(월~일)의 월요일 날짜 키
+func mondayKey(of day: String) -> String {
+    guard let d = dayKeyFormatter.date(from: day) else { return day }
+    let cal = Calendar(identifier: .gregorian)
+    let back = (cal.component(.weekday, from: d) + 5) % 7 // 월 0 · 화 1 · … · 일 6
+    return dayKey(cal.date(byAdding: .day, value: -back, to: d)!)
+}
+
+func weekListKey(of day: String) -> String { weekPrefix + mondayKey(of: day) }
 
 func fmtMinutes(_ sec: Double) -> String {
     let m = Int((sec / 60).rounded())

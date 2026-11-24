@@ -330,6 +330,8 @@ struct PlanView: View {
         let doneCount = todos.filter(\.done).count
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                WeekSection(day: day)
+
                 HStack(alignment: .center) {
                     Button { move(-1) } label: { Image(systemName: "chevron.left") }
                     VStack(alignment: .leading, spacing: 2) {
@@ -468,6 +470,72 @@ struct TodoSection: View {
         .overlay(alignment: .leading) {
             RoundedRectangle(cornerRadius: 2).fill(kind.color).frame(width: 4).padding(.vertical, 14)
         }
+    }
+}
+
+/// 이번 주 할 일 (보고 있는 날이 들어 있는 월~일). 오늘 할 일 위에 늘 보인다.
+struct WeekSection: View {
+    @EnvironmentObject var store: Store
+    let day: String
+    @State private var draft = ""
+    @State private var dragging: UUID?
+
+    var body: some View {
+        let key = weekListKey(of: day)
+        let items = store.todos(on: key)
+        let sorted = items.filter { !$0.done } + items.filter(\.done)
+        let thisWeek = mondayKey(of: dayKey(store.now)) == mondayKey(of: day)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "calendar").foregroundStyle(.purple)
+                Text(thisWeek ? L("이번 주", "This Week") : L("그 주", "That Week")).font(.headline)
+                Text(weekRange(mondayKey(of: day))).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                if !items.isEmpty {
+                    Text("\(items.filter(\.done).count)/\(items.count)")
+                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.bottom, 8)
+
+            ForEach(sorted) { item in
+                VStack(spacing: 0) {
+                    TodoRow(item: item, day: key, color: .purple)
+                    Divider().opacity(0.5)
+                }
+                .onDrag {
+                    dragging = item.id
+                    return NSItemProvider(object: item.id.uuidString as NSString)
+                }
+                .onDrop(of: [.text], delegate: TodoDrop(target: item.id, group: sorted.filter { $0.done == item.done }.map(\.id), dragging: $dragging) { from, to in
+                    withAnimation(.easeInOut(duration: 0.15)) { store.moveTodo(from, to: to, on: key) }
+                })
+            }
+
+            HStack(spacing: 10) {
+                Image(systemName: "plus").foregroundStyle(.purple).frame(width: 20)
+                TextField(L("이번 주에 끝낼 일 추가", "Add something to finish this week"), text: $draft)
+                    .textFieldStyle(.plain)
+                    .onSubmit {
+                        withAnimation { _ = store.addTodo(draft, kind: .must, on: key) }
+                        draft = ""
+                    }
+            }
+            .padding(.vertical, 8)
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 12).fill(.background.secondary))
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2).fill(Color.purple).frame(width: 4).padding(.vertical, 14)
+        }
+    }
+
+    /// "11/23–11/29"
+    private func weekRange(_ monday: String) -> String {
+        guard let d = dayKeyFormatter.date(from: monday),
+              let end = Calendar.current.date(byAdding: .day, value: 6, to: d) else { return "" }
+        let f = Date.FormatStyle().month(.defaultDigits).day()
+        return "\(d.formatted(f))–\(end.formatted(f))"
     }
 }
 
